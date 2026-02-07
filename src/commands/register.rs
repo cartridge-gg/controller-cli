@@ -216,40 +216,20 @@ fn store_session_from_api(
 ) -> Result<()> {
     use account_sdk::{
         account::session::hash::Session,
-        storage::{ControllerMetadata, Credentials, Owner, SessionMetadata, Signer},
+        storage::{ControllerMetadata, Credentials, Owner, SessionMetadata},
     };
 
     // Parse authorization as Vec<Felt>
     let authorization = session_info.authorization_as_felts()?;
 
-    // Parse address, chain_id, class_hash, salt
+    // Parse address and chain_id from subscription response
     let address = session_info.address_as_felt()?;
     let chain_id = session_info.chain_id_as_felt()?;
-    let class_hash = session_info.class_hash_as_felt()?;
-    let salt = session_info.salt_as_felt()?;
 
     // Calculate session_key_guid from public key
     let pubkey_felt = starknet::core::types::Felt::from_hex(public_key)
         .map_err(|e| CliError::InvalidInput(format!("Invalid public key: {}", e)))?;
     let session_key_guid = pubkey_felt;
-
-    // Convert owner signer info to storage types
-    let owner = match session_info.owner_signer {
-        api::SignerInfo::Starknet { private_key } => {
-            let pk = starknet::core::types::Felt::from_hex(&private_key).map_err(|e| {
-                CliError::InvalidSessionData(format!("Invalid owner private key: {}", e))
-            })?;
-            Owner::Signer(Signer::Starknet(account_sdk::storage::StarknetSigner {
-                private_key: pk,
-            }))
-        }
-        api::SignerInfo::Webauthn { data } => {
-            // TODO: Implement webauthn signer parsing when needed
-            return Err(CliError::InvalidSessionData(
-                "Webauthn signers not yet supported in CLI".to_string(),
-            ));
-        }
-    };
 
     // Create session metadata
     let session_metadata = SessionMetadata {
@@ -263,25 +243,26 @@ fn store_session_from_api(
                 allowed_policies_root: starknet::core::types::Felt::ZERO, // TODO: Calculate from policies
                 metadata_hash: starknet::core::types::Felt::ZERO,
                 session_key_guid,
-                guardian_key_guid: starknet::core::types::Felt::ZERO, // TODO: Get from API if needed
+                guardian_key_guid: starknet::core::types::Felt::ZERO,
             },
-            requested_policies: vec![], // TODO: Store policies if needed
+            requested_policies: vec![],
             proved_policies: vec![],
             metadata: "{}".to_string(),
         },
         max_fee: None,
-        is_registered: true, // Session is registered after authorization
+        is_registered: true,
     };
 
-    // Create controller metadata
+    // Create minimal controller metadata with placeholder values
+    // We only need address and chain_id for SessionAccount::new()
     let controller_metadata = ControllerMetadata {
         address,
         chain_id,
-        class_hash,
-        rpc_url: session_info.rpc_url,
-        salt,
-        owner,
-        username: session_info.username,
+        class_hash: starknet::core::types::Felt::ZERO, // Not needed for execution
+        rpc_url: "".to_string(),                       // Not used (CLI uses config.session.default_rpc_url)
+        salt: starknet::core::types::Felt::ZERO,       // Not needed for execution
+        owner: Owner::Account(starknet::core::types::Felt::ZERO), // Not needed for execution with authorization
+        username: session_info.controller.account_id.clone(), // Use account_id as username
     };
 
     // Store session and controller metadata

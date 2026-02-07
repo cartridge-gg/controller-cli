@@ -164,35 +164,24 @@ pub struct SessionConfig {
 
 ## Backend Requirements
 
-### GraphQL Query to Implement
+### GraphQL Query Used
+
+The CLI uses the **existing** `subscribeCreateSession` query from controller-rs:
 
 ```graphql
-query SessionInfo($sessionKeyGuid: String!) {
-  session(sessionKeyGuid: $sessionKeyGuid) {
-    # Authorization signature (Vec<Felt>)
-    authorization
-
-    # Controller account details
-    address
-    chainId
-    username
-    classHash
-    rpcUrl
-    salt
-
-    # Session details
+query SubscribeCreateSession($sessionKeyGuid: Felt!) {
+  subscribeCreateSession(sessionKeyGuid: $sessionKeyGuid) {
+    id
+    appID
+    chainID
+    isRevoked
     expiresAt
-
-    # Owner signer details
-    ownerSigner {
-      type
-      ... on StarknetSigner {
-        privateKey  # For storage (not for signing transactions!)
-      }
-      ... on WebauthnSigner {
-        # TBD: Define webauthn storage fields
-        data
-      }
+    createdAt
+    updatedAt
+    authorization
+    controller {
+      address
+      accountID
     }
   }
 }
@@ -201,6 +190,15 @@ query SessionInfo($sessionKeyGuid: String!) {
 **Returns:**
 - `null` if session doesn't exist yet
 - Session data once user authorizes in browser
+
+**Note:** The CLI only uses these fields from the response:
+- `authorization` - for SessionAccount creation
+- `controller.address` - account address
+- `chainID` - chain identifier
+- `expiresAt` - session expiration timestamp
+- `controller.accountID` - stored as username
+
+Other fields (`username`, `class_hash`, `rpc_url`, `salt`, `owner`) are stored with placeholder values since they're not needed for transaction execution.
 
 ### Security Measures to Implement
 
@@ -261,10 +259,12 @@ reqwest = { version = "0.12", features = ["json"] }  # HTTP client for API queri
 
 ## Next Steps
 
-1. **Backend Team**: Implement `SessionInfo` GraphQL query with security measures
+1. **Backend Team**:
+   - ✅ `subscribeCreateSession` query already exists (no changes needed!)
+   - Add security measures (rate limiting, time windows) to existing query
 2. **Frontend Team**: Update keychain to detect `mode=cli` parameter
-3. **Testing**: End-to-end testing once backend is ready
-4. **Documentation**: Update README with new workflow details
+3. **Testing**: End-to-end testing once keychain changes are ready
+4. **Documentation**: ✅ README updated with new workflow
 
 ## Notes
 

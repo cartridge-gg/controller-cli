@@ -5,26 +5,18 @@ use starknet::core::types::Felt;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SessionInfo {
     pub authorization: Vec<String>, // Hex-encoded Felt values
-    pub address: String,
+    pub controller: ControllerInfo,
+    #[serde(rename = "chainID")]
     pub chain_id: String,
+    #[serde(rename = "expiresAt")]
     pub expires_at: u64,
-    pub username: String,
-    pub class_hash: String,
-    pub rpc_url: String,
-    pub salt: String,
-    pub owner_signer: SignerInfo,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
-pub enum SignerInfo {
-    Starknet {
-        private_key: String, // Hex-encoded Felt for storage (not for signing!)
-    },
-    Webauthn {
-        // TODO: Define webauthn storage fields based on account_sdk requirements
-        data: String,
-    },
+pub struct ControllerInfo {
+    pub address: String,
+    #[serde(rename = "accountID")]
+    pub account_id: String,
 }
 
 /// Query session information from the Cartridge API
@@ -40,50 +32,25 @@ pub async fn query_session_info(
     api_url: &str,
     session_key_guid: &str,
 ) -> Result<Option<SessionInfo>> {
-    // TODO: Replace with actual GraphQL query once backend implements SessionInfo endpoint
-    //
-    // Expected GraphQL query:
-    // query SessionInfo($sessionKeyGuid: String!) {
-    //   session(sessionKeyGuid: $sessionKeyGuid) {
-    //     authorization
-    //     address
-    //     chainId
-    //     expiresAt
-    //     username
-    //     classHash
-    //     rpcUrl
-    //     salt
-    //     ownerSigner {
-    //       type
-    //       ... on StarknetSigner {
-    //         privateKey  # For storage, not signing
-    //       }
-    //       ... on WebauthnSigner {
-    //         # TBD: webauthn storage fields
-    //       }
-    //     }
-    //   }
-    // }
+    // Uses existing subscribeCreateSession query from controller-rs
+    // See: account_sdk/src/graphql/session/subscribe-create-session.graphql
 
     let client = reqwest::Client::new();
 
     let query = r#"
-        query SessionInfo($sessionKeyGuid: String!) {
-            session(sessionKeyGuid: $sessionKeyGuid) {
-                authorization
-                address
-                chainId
+        query SubscribeCreateSession($sessionKeyGuid: Felt!) {
+            subscribeCreateSession(sessionKeyGuid: $sessionKeyGuid) {
+                id
+                appID
+                chainID
+                isRevoked
                 expiresAt
-                ownerSigner {
-                    type
-                    ... on StarknetSigner {
-                        publicKey
-                    }
-                    ... on WebauthnSigner {
-                        origin
-                        rpId
-                        publicKey
-                    }
+                createdAt
+                updatedAt
+                authorization
+                controller {
+                    address
+                    accountID
                 }
             }
         }
@@ -109,7 +76,8 @@ pub async fn query_session_info(
 
     #[derive(Deserialize)]
     struct GraphQLData {
-        session: Option<SessionInfo>,
+        #[serde(rename = "subscribeCreateSession")]
+        subscribe_create_session: Option<SessionInfo>,
     }
 
     #[derive(Deserialize)]
@@ -151,7 +119,9 @@ pub async fn query_session_info(
         )));
     }
 
-    Ok(graphql_response.data.and_then(|data| data.session))
+    Ok(graphql_response
+        .data
+        .and_then(|data| data.subscribe_create_session))
 }
 
 impl SessionInfo {
@@ -169,25 +139,14 @@ impl SessionInfo {
 
     /// Convert address string to Felt
     pub fn address_as_felt(&self) -> Result<Felt> {
-        Felt::from_hex(&self.address)
-            .map_err(|e| CliError::InvalidSessionData(format!("Invalid address hex: {}", e)))
+        Felt::from_hex(&self.controller.address).map_err(|e| {
+            CliError::InvalidSessionData(format!("Invalid address hex: {}", e))
+        })
     }
 
     /// Convert chain_id string to Felt
     pub fn chain_id_as_felt(&self) -> Result<Felt> {
         Felt::from_hex(&self.chain_id)
             .map_err(|e| CliError::InvalidSessionData(format!("Invalid chain_id hex: {}", e)))
-    }
-
-    /// Convert class_hash string to Felt
-    pub fn class_hash_as_felt(&self) -> Result<Felt> {
-        Felt::from_hex(&self.class_hash)
-            .map_err(|e| CliError::InvalidSessionData(format!("Invalid class_hash hex: {}", e)))
-    }
-
-    /// Convert salt string to Felt
-    pub fn salt_as_felt(&self) -> Result<Felt> {
-        Felt::from_hex(&self.salt)
-            .map_err(|e| CliError::InvalidSessionData(format!("Invalid salt hex: {}", e)))
     }
 }
