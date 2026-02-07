@@ -1,0 +1,139 @@
+{
+  "name": "controller",
+  "description": "Execute Starknet transactions using Cartridge Controller sessions with human-authorized policies",
+  "version": "0.1.0",
+  "tools": [
+    {
+      "name": "controller_generate_keypair",
+      "description": "Generate a new session keypair for signing Starknet transactions. First step in session setup.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "command": "controller generate-keypair --json"
+    },
+    {
+      "name": "controller_status",
+      "description": "Check current session status, expiration time, and keypair information. Use before executing transactions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "command": "controller status --json"
+    },
+    {
+      "name": "controller_register_session",
+      "description": "Register a new session with specific contract/method policies. IMPORTANT: Requires human to authorize via browser. Display the authorization URL to the user and wait for them to authorize.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "policy_file": {
+            "type": "string",
+            "description": "Path to JSON policy file defining allowed contracts and methods"
+          }
+        },
+        "required": ["policy_file"]
+      },
+      "command": "controller register-session {policy_file} --json"
+    },
+    {
+      "name": "controller_execute",
+      "description": "Execute a Starknet transaction using the active session. Supports single calls or multiple calls from file. Transactions are automatically subsidized on Sepolia.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contract": {
+            "type": "string",
+            "description": "Contract address (hex with 0x prefix). Use with entrypoint and calldata for single call."
+          },
+          "entrypoint": {
+            "type": "string",
+            "description": "Function name to call. Use with contract and calldata for single call."
+          },
+          "calldata": {
+            "type": "string",
+            "description": "Comma-separated calldata values (hex with 0x prefix). Use with contract and entrypoint for single call."
+          },
+          "file": {
+            "type": "string",
+            "description": "Path to JSON file with multiple calls. Alternative to contract/entrypoint/calldata."
+          },
+          "wait": {
+            "type": "boolean",
+            "description": "Wait for transaction confirmation. Default: false",
+            "default": false
+          },
+          "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds when waiting. Default: 300",
+            "default": 300
+          }
+        },
+        "anyOf": [
+          {"required": ["contract", "entrypoint", "calldata"]},
+          {"required": ["file"]}
+        ]
+      },
+      "command": "controller execute {contract:--contract} {entrypoint:--entrypoint} {calldata:--calldata} {file:--file} {wait:--wait} {timeout:--timeout} --json"
+    },
+    {
+      "name": "controller_clear",
+      "description": "Clear all stored session data and keypairs. Use to reset or troubleshoot.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "yes": {
+            "type": "boolean",
+            "description": "Skip confirmation prompt",
+            "default": true
+          }
+        }
+      },
+      "command": "controller clear {yes:--yes}"
+    }
+  ],
+  "examples": [
+    {
+      "title": "Check Session Status",
+      "tool": "controller_status",
+      "input": {}
+    },
+    {
+      "title": "Generate Keypair",
+      "tool": "controller_generate_keypair",
+      "input": {}
+    },
+    {
+      "title": "Register Session",
+      "tool": "controller_register_session",
+      "input": {
+        "policy_file": "policy.json"
+      }
+    },
+    {
+      "title": "Transfer Tokens",
+      "tool": "controller_execute",
+      "input": {
+        "contract": "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+        "entrypoint": "transfer",
+        "calldata": "0xRECIPIENT,0x64,0x0"
+      }
+    },
+    {
+      "title": "Execute Multiple Calls",
+      "tool": "controller_execute",
+      "input": {
+        "file": "calls.json",
+        "wait": true
+      }
+    }
+  ],
+  "commonContracts": {
+    "sepolia": {
+      "STRK": "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+      "ETH": "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7"
+    }
+  }
+}
