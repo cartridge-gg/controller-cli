@@ -114,11 +114,11 @@ pub async fn execute(
                             let selector =
                                 starknet::core::utils::get_selector_from_name(&method.entrypoint)
                                     .map_err(|e| {
-                                        CliError::InvalidInput(format!(
-                                            "Invalid entrypoint name {}: {}",
-                                            method.entrypoint, e
-                                        ))
-                                    })?;
+                                    CliError::InvalidInput(format!(
+                                        "Invalid entrypoint name {}: {}",
+                                        method.entrypoint, e
+                                    ))
+                                })?;
 
                             policy_vec.push(account_sdk::account::session::policy::Policy::Call(
                                 account_sdk::account::session::policy::CallPolicy {
@@ -316,10 +316,10 @@ fn store_session_from_api(
         address,
         chain_id,
         class_hash: starknet::core::types::Felt::ZERO, // Not needed for execution
-        rpc_url: "".to_string(),                       // Not used (CLI uses config.session.default_rpc_url)
-        salt: starknet::core::types::Felt::ZERO,       // Not needed for execution
+        rpc_url: "".to_string(), // Not used (CLI uses config.session.default_rpc_url)
+        salt: starknet::core::types::Felt::ZERO, // Not needed for execution
         owner: Owner::Account(starknet::core::types::Felt::ZERO), // Not needed for execution with authorization
-        username: session_info.controller.account_id.clone(), // Use account_id as username
+        username: session_info.controller.account_id.clone(),     // Use account_id as username
     };
 
     // Store session and controller metadata using the correct key format

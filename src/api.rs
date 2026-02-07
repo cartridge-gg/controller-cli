@@ -139,9 +139,8 @@ impl SessionInfo {
 
     /// Convert address string to Felt
     pub fn address_as_felt(&self) -> Result<Felt> {
-        Felt::from_hex(&self.controller.address).map_err(|e| {
-            CliError::InvalidSessionData(format!("Invalid address hex: {}", e))
-        })
+        Felt::from_hex(&self.controller.address)
+            .map_err(|e| CliError::InvalidSessionData(format!("Invalid address hex: {}", e)))
     }
 
     /// Convert chain_id string to Felt

@@ -82,8 +82,10 @@ pub async fn execute(
         .ok_or_else(|| CliError::InvalidSessionData("No controller metadata found".to_string()))?;
 
     // Construct the session key using the same format as Controller
-    let session_key = format!("@cartridge/session/0x{:x}/0x{:x}",
-                              controller_metadata.address, controller_metadata.chain_id);
+    let session_key = format!(
+        "@cartridge/session/0x{:x}/0x{:x}",
+        controller_metadata.address, controller_metadata.chain_id
+    );
 
     let session_metadata = backend
         .session(&session_key)

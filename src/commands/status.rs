@@ -60,8 +60,10 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
 
     let session_info = if let Some(controller) = &controller_metadata {
         // Construct the session key using the same format as Controller
-        let session_key = format!("@cartridge/session/0x{:x}/0x{:x}",
-                                  controller.address, controller.chain_id);
+        let session_key = format!(
+            "@cartridge/session/0x{:x}/0x{:x}",
+            controller.address, controller.chain_id
+        );
 
         match backend.session(&session_key) {
             Ok(Some(metadata)) => {
