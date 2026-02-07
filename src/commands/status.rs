@@ -55,35 +55,42 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
     };
 
     // Check for stored session and controller metadata
-    let session_info = match backend.session("session") {
-        Ok(Some(metadata)) => {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+    // First get controller metadata to construct the proper session key
+    let controller_metadata = backend.controller().ok().flatten();
 
-            let expires_at = metadata.session.inner.expires_at;
-            let expires_in = expires_at as i64 - now as i64;
-            let is_expired = metadata.session.is_expired();
+    let session_info = if let Some(controller) = &controller_metadata {
+        // Construct the session key using the same format as Controller
+        let session_key = format!("@cartridge/session/0x{:x}/0x{:x}",
+                                  controller.address, controller.chain_id);
 
-            let expires_at_dt =
-                DateTime::from_timestamp(expires_at as i64, 0).unwrap_or_else(|| Utc::now());
+        match backend.session(&session_key) {
+            Ok(Some(metadata)) => {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
 
-            // Try to get account address from controller metadata
-            let address = match backend.controller() {
-                Ok(Some(controller)) => format!("0x{:x}", controller.address),
-                _ => "unknown".to_string(),
-            };
+                let expires_at = metadata.session.inner.expires_at;
+                let expires_in = expires_at as i64 - now as i64;
+                let is_expired = metadata.session.is_expired();
 
-            Some(SessionInfo {
-                address,
-                expires_at,
-                expires_in_seconds: expires_in,
-                expires_at_formatted: expires_at_dt.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
-                is_expired,
-            })
+                let expires_at_dt =
+                    DateTime::from_timestamp(expires_at as i64, 0).unwrap_or_else(|| Utc::now());
+
+                let address = format!("0x{:x}", controller.address);
+
+                Some(SessionInfo {
+                    address,
+                    expires_at,
+                    expires_in_seconds: expires_in,
+                    expires_at_formatted: expires_at_dt.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+                    is_expired,
+                })
+            }
+            _ => None,
         }
-        _ => None,
+    } else {
+        None
     };
 
     let status = if session_info.is_some() && !session_info.as_ref().unwrap().is_expired {

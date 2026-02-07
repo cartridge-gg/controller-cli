@@ -322,9 +322,12 @@ fn store_session_from_api(
         username: session_info.controller.account_id.clone(), // Use account_id as username
     };
 
-    // Store session and controller metadata
+    // Store session and controller metadata using the correct key format
+    // Key format: @cartridge/session/0x{address:x}/0x{chain_id:x}
+    let session_key = format!("@cartridge/session/0x{:x}/0x{:x}", address, chain_id);
+
     backend
-        .set_session("session", session_metadata)
+        .set_session(&session_key, session_metadata)
         .map_err(|e| CliError::Storage(e.to_string()))?;
 
     backend

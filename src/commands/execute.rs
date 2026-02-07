@@ -4,14 +4,12 @@ use crate::{
     output::OutputFormatter,
 };
 use account_sdk::{
-    account::session::account::SessionAccount,
-    provider::CartridgeJsonRpcProvider,
-    signers::Signer,
+    controller::Controller,
+    signers::{Owner, Signer},
     storage::{filestorage::FileSystemBackend, StorageBackend},
 };
 use serde::{Deserialize, Serialize};
 use starknet::{
-    accounts::{Account, ConnectedAccount},
     core::types::{Call, Felt},
     providers::Provider,
 };
@@ -74,12 +72,21 @@ pub async fn execute(
 
     formatter.info(&format!("Preparing to execute {} call(s)...", calls.len()));
 
-    // Load session and credentials from storage
+    // Load controller metadata first to get address and chain_id for session key
     let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
     let backend = FileSystemBackend::new(storage_path);
 
+    let controller_metadata = backend
+        .controller()
+        .map_err(|e| CliError::Storage(e.to_string()))?
+        .ok_or_else(|| CliError::InvalidSessionData("No controller metadata found".to_string()))?;
+
+    // Construct the session key using the same format as Controller
+    let session_key = format!("@cartridge/session/0x{:x}/0x{:x}",
+                              controller_metadata.address, controller_metadata.chain_id);
+
     let session_metadata = backend
-        .session("session")
+        .session(&session_key)
         .map_err(|e| CliError::Storage(e.to_string()))?
         .ok_or(CliError::NoSession)?;
 
@@ -98,32 +105,21 @@ pub async fn execute(
         .credentials
         .ok_or_else(|| CliError::InvalidSessionData("No credentials found".to_string()))?;
 
-    // Load controller metadata to get address
-    let controller_metadata = backend
-        .controller()
-        .map_err(|e| CliError::Storage(e.to_string()))?
-        .ok_or_else(|| CliError::InvalidSessionData("No controller metadata found".to_string()))?;
-
     // Create signer from stored private key
     let signing_key = starknet::signers::SigningKey::from_secret_scalar(credentials.private_key);
-    let signer = Signer::Starknet(signing_key);
+    let owner = Owner::Signer(Signer::Starknet(signing_key));
 
-    // Get authorization from credentials
-    let authorization = credentials.authorization.clone();
-
-    // Create provider
-    let provider =
-        CartridgeJsonRpcProvider::new(url::Url::parse(&config.session.default_rpc_url).unwrap());
-
-    // Create session account using authorization
-    let session_account = SessionAccount::new(
-        provider,
-        signer,
+    // Create Controller with session storage for try_session_execute
+    let mut controller = Controller::new(
+        controller_metadata.username.clone(),
+        controller_metadata.class_hash,
+        url::Url::parse(&config.session.default_rpc_url).unwrap(),
+        owner,
         controller_metadata.address,
-        controller_metadata.chain_id,
-        authorization,
-        session_metadata.session.clone(),
-    );
+        Some(backend),
+    )
+    .await
+    .map_err(|e| CliError::Storage(format!("Failed to create controller: {}", e)))?;
 
     // Convert CallSpec to starknet Call
     let starknet_calls: Vec<Call> = calls
@@ -152,13 +148,12 @@ pub async fn execute(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    formatter.info("Executing transaction...");
+    formatter.info("Executing transaction with try_session_execute (auto-subsidized)...");
 
-    // Execute the calls
-    let execution = session_account.execute_v3(starknet_calls);
-
-    let result = execution
-        .send()
+    // Use try_session_execute which automatically tries execute_from_outside first (subsidized)
+    // Falls back to regular execute if paymaster not supported
+    let result = controller
+        .try_session_execute(starknet_calls, None)
         .await
         .map_err(|e| CliError::TransactionFailed(format!("Transaction failed: {}", e)))?;
 
@@ -191,8 +186,8 @@ pub async fn execute(
             }
 
             // Check transaction status
-            match session_account
-                .provider()
+            match controller
+                .provider
                 .get_transaction_receipt(result.transaction_hash)
                 .await
             {
