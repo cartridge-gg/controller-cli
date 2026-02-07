@@ -13,7 +13,10 @@ path = "src/main.rs"
 
 [dependencies]
 # Use existing account_sdk from controller-rs
-account_sdk = { path = "../controller-rs/account_sdk", features = ["filestorage"] }
+# Local development: use path dependency
+# account_sdk = { path = "../controller-rs/account_sdk", features = ["filestorage"] }
+# Release builds: use git dependency
+account_sdk = { git = "https://github.com/cartridge-gg/controller-rs", package = "account_sdk", features = ["filestorage"] }
 
 # CLI framework
 clap = { version = "4.5", features = ["derive", "env"] }
