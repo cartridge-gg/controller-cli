@@ -2,6 +2,36 @@
 
 This guide provides instructions for LLMs (Large Language Models) to install and use the Cartridge Controller CLI for executing Starknet transactions.
 
+## Quick Start: Use the Skill (Recommended)
+
+**The easiest way to use the controller is through the MCP skill:**
+
+```bash
+# Install the skill
+git clone https://github.com/broody/controller-cli.git
+ln -s "$(pwd)/controller-cli/.claude/skills/controller-skill" ~/.claude/skills/controller-skill
+```
+
+The skill provides 5 tools:
+- `controller_generate_keypair` - Generate session keypair
+- `controller_status` - Check session status
+- `controller_register_session` - Register session (requires human auth)
+- `controller_execute` - Execute transactions
+- `controller_clear` - Clear session data
+
+**See:** [Skill Documentation](./.claude/skills/controller-skill/README.md)
+
+Once installed, you can simply ask:
+- "Check my controller status"
+- "Send 100 STRK to 0xabc123"
+- "Execute a transaction on Starknet"
+
+---
+
+## Manual Usage (Alternative)
+
+If you prefer to use the CLI directly without the skill, follow the instructions below.
+
 ## Installation
 
 Run this single command to install:
@@ -332,8 +362,16 @@ controller execute --file multicall.json --wait --json
 - Human authorization required for all sessions (cannot be automated)
 - All transactions are automatically subsidized on Sepolia testnet
 
+## Recommended: Use the Skill
+
+For easier integration, use the MCP skill instead of manual CLI commands:
+- **Skill Documentation:** [.claude/skills/controller-skill/README.md](./.claude/skills/controller-skill/README.md)
+- **Installation:** `ln -s "$(pwd)/controller-cli/.claude/skills/controller-skill" ~/.claude/skills/controller-skill`
+- **Benefits:** Structured tools, automatic JSON parsing, better error handling
+
 ## Support
 
-- Repository: https://github.com/broody/controller
-- Issues: https://github.com/broody/controller/issues
-- Documentation: https://github.com/broody/controller
+- Repository: https://github.com/broody/controller-cli
+- Issues: https://github.com/broody/controller-cli/issues
+- Documentation: https://github.com/broody/controller-cli
+- Skill: [.claude/skills/controller-skill](./.claude/skills/controller-skill)
