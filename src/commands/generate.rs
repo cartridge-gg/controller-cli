@@ -47,7 +47,13 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
             .to_string(),
     };
 
-    formatter.success(&output);
+    if config.cli.json_output {
+        formatter.success(&output);
+    } else {
+        formatter
+            .info("Keypair generated successfully. Use this public key for session registration.");
+        println!("\nPublic Key: {}\n", public_key);
+    }
 
     Ok(())
 }

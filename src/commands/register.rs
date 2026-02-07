@@ -51,7 +51,7 @@ pub struct RegisterOutput {
 pub async fn execute(
     config: &Config,
     formatter: &dyn OutputFormatter,
-    policy_file: Option<String>,
+    policy_file: String,
 ) -> Result<()> {
     // Load the stored keypair
     let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
@@ -72,84 +72,73 @@ pub async fn execute(
         }
     };
 
-    // Load policies from file if provided
-    let (policies_json, parsed_policies) = if let Some(policy_file_path) = policy_file {
-        let policy_content = std::fs::read_to_string(&policy_file_path)
-            .map_err(|e| CliError::InvalidInput(format!("Failed to read policy file: {}", e)))?;
+    // Load policies from file
+    let policy_content = std::fs::read_to_string(&policy_file)
+        .map_err(|e| CliError::InvalidInput(format!("Failed to read policy file: {}", e)))?;
 
-        let policy_file: PolicyFile = serde_json::from_str(&policy_content)
-            .map_err(|e| CliError::InvalidInput(format!("Invalid policy file format: {}", e)))?;
+    let policy_file: PolicyFile = serde_json::from_str(&policy_content)
+        .map_err(|e| CliError::InvalidInput(format!("Invalid policy file format: {}", e)))?;
 
-        // Convert to the format expected by the keychain
-        let mut policies = serde_json::json!({
-            "verified": false,
-            "contracts": {}
-        });
+    // Convert to the format expected by the keychain
+    let mut policies = serde_json::json!({
+        "verified": false,
+        "contracts": {}
+    });
 
-        // Also build Policy structures for storage
-        let mut policy_vec = Vec::new();
+    // Also build Policy structures for storage
+    let mut policy_vec = Vec::new();
 
-        if let Some(contracts) = policies.as_object_mut() {
-            if let Some(contracts_obj) = contracts.get_mut("contracts") {
-                if let Some(contracts_map) = contracts_obj.as_object_mut() {
-                    for (address, contract) in policy_file.contracts {
-                        contracts_map.insert(
-                            address.clone(),
-                            serde_json::json!({
-                                "methods": contract.methods
-                            }),
-                        );
+    if let Some(contracts) = policies.as_object_mut() {
+        if let Some(contracts_obj) = contracts.get_mut("contracts") {
+            if let Some(contracts_map) = contracts_obj.as_object_mut() {
+                for (address, contract) in policy_file.contracts {
+                    contracts_map.insert(
+                        address.clone(),
+                        serde_json::json!({
+                            "methods": contract.methods
+                        }),
+                    );
 
-                        // Parse address and create Policy for each method
-                        let contract_address = starknet::core::types::Felt::from_hex(&address)
-                            .map_err(|e| {
-                                CliError::InvalidInput(format!(
-                                    "Invalid contract address {}: {}",
-                                    address, e
-                                ))
-                            })?;
+                    // Parse address and create Policy for each method
+                    let contract_address = starknet::core::types::Felt::from_hex(&address)
+                        .map_err(|e| {
+                            CliError::InvalidInput(format!(
+                                "Invalid contract address {}: {}",
+                                address, e
+                            ))
+                        })?;
 
-                        for method in &contract.methods {
-                            // Compute selector from entrypoint name
-                            let selector =
-                                starknet::core::utils::get_selector_from_name(&method.entrypoint)
-                                    .map_err(|e| {
+                    for method in &contract.methods {
+                        // Compute selector from entrypoint name
+                        let selector =
+                            starknet::core::utils::get_selector_from_name(&method.entrypoint)
+                                .map_err(|e| {
                                     CliError::InvalidInput(format!(
                                         "Invalid entrypoint name {}: {}",
                                         method.entrypoint, e
                                     ))
                                 })?;
 
-                            policy_vec.push(account_sdk::account::session::policy::Policy::Call(
-                                account_sdk::account::session::policy::CallPolicy {
-                                    contract_address,
-                                    selector,
-                                    authorized: Some(method.authorized),
-                                },
-                            ));
-                        }
+                        policy_vec.push(account_sdk::account::session::policy::Policy::Call(
+                            account_sdk::account::session::policy::CallPolicy {
+                                contract_address,
+                                selector,
+                                authorized: Some(method.authorized),
+                            },
+                        ));
                     }
                 }
             }
         }
+    }
 
-        if let Some(messages) = policy_file.messages {
-            policies["messages"] = serde_json::json!(messages);
-        }
+    if let Some(messages) = policy_file.messages {
+        policies["messages"] = serde_json::json!(messages);
+    }
 
-        let json = serde_json::to_string(&policies)
-            .map_err(|e| CliError::InvalidInput(format!("Failed to serialize policies: {}", e)))?;
-
-        (json, policy_vec)
-    } else {
-        // Default empty policies for wildcard session
-        let json = serde_json::to_string(&serde_json::json!({
-            "verified": false,
-            "contracts": {}
-        }))
-        .unwrap();
-        (json, Vec::new())
-    };
+    let policies_json = serde_json::to_string(&policies)
+        .map_err(|e| CliError::InvalidInput(format!("Failed to serialize policies: {}", e)))?;
+    let parsed_policies = policy_vec;
 
     // Build the authorization URL
     let mut url = Url::parse(&format!("{}/session", config.session.keychain_url))
@@ -165,9 +154,6 @@ pub async fn execute(
 
     let authorization_url = url.to_string();
 
-    // First, check if session already exists (idempotency)
-    formatter.info("Checking for existing session...");
-
     // Show URL and start polling
     let output = RegisterOutput {
         authorization_url: authorization_url.clone(),
@@ -177,10 +163,10 @@ pub async fn execute(
                 .to_string(),
     };
 
-    formatter.success(&output);
-
-    if !config.cli.json_output {
-        formatter.info("\nAuthorization URL:");
+    if config.cli.json_output {
+        formatter.success(&output);
+    } else {
+        formatter.info("Authorization URL:");
         println!("\n{}\n", authorization_url);
         formatter.info("\nWaiting for authorization (timeout: 5 minutes)...");
     }
@@ -210,10 +196,6 @@ pub async fn execute(
 
     loop {
         attempts += 1;
-
-        if !config.cli.json_output {
-            formatter.info(&format!("Polling attempt {}/{}...", attempts, max_attempts));
-        }
 
         match api::query_session_info(&config.session.api_url, &session_key_guid).await? {
             Some(session_info) => {

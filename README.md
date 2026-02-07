@@ -45,13 +45,13 @@ Shows current session status, keypair info, and expiration details.
 Generate an authorization URL and wait for authorization:
 
 ```bash
-controller-cli register-session --policy-file examples/policies.json
+controller-cli register-session examples/policies.json
 ```
 
 This will:
 - Generate an authorization URL with your public key and policies
 - Display the URL for you to open in a browser
-- **Automatically poll the API** until you authorize (polls every 3 seconds, 5-minute timeout)
+- **Automatically poll the API** until you authorize (polls every 2 minutes, 6-minute total timeout)
 - **Automatically store the session** once authorization is detected
 
 Simply open the displayed URL in your browser and authorize - the CLI will handle the rest!
@@ -63,6 +63,7 @@ Authorization URL:
 https://x.cartridge.gg/session?public_key=0x...&policies=...
 
 Waiting for authorization (timeout: 5 minutes)...
+Session Key GUID: 0x...
 Authorization received! Storing session...
 ✅ Session registered and stored successfully
 ```
@@ -90,7 +91,7 @@ controller-cli execute \
 **Multiple calls from file** (see `examples/calls.json`):
 
 ```bash
-controller-cli execute --call-file examples/calls.json
+controller-cli execute --file examples/calls.json
 ```
 
 Call file format:
@@ -109,12 +110,13 @@ Call file format:
 **Wait for confirmation**:
 
 ```bash
-controller-cli execute --call-file calls.json --wait --timeout 300
+controller-cli execute --file calls.json --wait --timeout 300
 ```
 
 The execute command will:
 - Load and validate your session (check expiration)
-- Create a SessionAccount from stored credentials
+- Create a Controller from stored credentials
+- Automatically attempt subsidized execution via `execute_from_outside` (falls back to regular execution if not supported)
 - Execute the transaction on Starknet
 - Return the transaction hash
 - Optionally wait for confirmation (with `--wait` flag)
@@ -129,13 +131,13 @@ Removes all stored session data.
 
 ## JSON Output
 
-All commands support `--json` flag for machine-readable output, useful for scripting and automation:
+All commands support `--json` flag for machine-readable output, useful for scripting and automation. Without this flag, commands display human-readable output.
 
 ```bash
 controller-cli status --json
 ```
 
-Output format:
+Example JSON output format:
 
 ```json
 {
@@ -224,7 +226,7 @@ if [ "$(echo $STATUS | jq -r '.status')" = "no_session" ]; then
   controller-cli generate-keypair --json
 
   # Register session (this will block until authorized)
-  controller-cli register-session --policy-file policies.json --json
+  controller-cli register-session policies.json --json
   # User opens URL in browser and authorizes
 fi
 
@@ -271,7 +273,7 @@ Agent: [Generates keypair]
 > Result: {"public_key": "0x78ad12..."}
 
 Agent: [Requests authorization and waits]
-> controller-cli register-session --policy-file policies.json --json
+> controller-cli register-session policies.json --json
 
 Agent: "Please open this URL to authorize the session:
        https://x.cartridge.gg/session?public_key=...

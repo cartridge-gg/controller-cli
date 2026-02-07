@@ -33,8 +33,7 @@ enum Commands {
     /// Generate authorization URL for session registration
     RegisterSession {
         /// Path to policy file (JSON)
-        #[arg(long)]
-        policy_file: Option<String>,
+        policy_file: String,
     },
 
     /// Manually store session credentials from authorization
@@ -63,7 +62,7 @@ enum Commands {
 
         /// Read calls from JSON file
         #[arg(long)]
-        call_file: Option<String>,
+        file: Option<String>,
 
         /// Wait for transaction confirmation
         #[arg(long)]
@@ -116,7 +115,7 @@ async fn main() {
             contract,
             entrypoint,
             calldata,
-            call_file,
+            file,
             wait,
             timeout,
         } => {
@@ -126,7 +125,7 @@ async fn main() {
                 contract,
                 entrypoint,
                 calldata,
-                call_file,
+                file,
                 wait,
                 timeout,
             )

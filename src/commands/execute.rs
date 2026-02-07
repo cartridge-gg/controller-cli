@@ -41,18 +41,18 @@ pub async fn execute(
     contract: Option<String>,
     entrypoint: Option<String>,
     calldata: Option<String>,
-    call_file: Option<String>,
+    file: Option<String>,
     wait: bool,
     timeout: u64,
 ) -> Result<()> {
     // Parse calls from arguments or file
-    let calls = if let Some(call_file_path) = call_file {
+    let calls = if let Some(file_path) = file {
         // Load calls from JSON file
-        let file_content = std::fs::read_to_string(&call_file_path)
-            .map_err(|e| CliError::InvalidInput(format!("Failed to read call file: {}", e)))?;
+        let file_content = std::fs::read_to_string(&file_path)
+            .map_err(|e| CliError::InvalidInput(format!("Failed to read file: {}", e)))?;
 
         let call_file: CallFile = serde_json::from_str(&file_content)
-            .map_err(|e| CliError::InvalidInput(format!("Invalid call file format: {}", e)))?;
+            .map_err(|e| CliError::InvalidInput(format!("Invalid file format: {}", e)))?;
 
         call_file.calls
     } else if let (Some(contract_addr), Some(entry), Some(data)) = (contract, entrypoint, calldata)
@@ -65,7 +65,7 @@ pub async fn execute(
         }]
     } else {
         return Err(CliError::InvalidInput(
-            "Either --call-file or all of --contract, --entrypoint, --calldata must be provided"
+            "Either --file or all of --contract, --entrypoint, --calldata must be provided"
                 .to_string(),
         ));
     };
