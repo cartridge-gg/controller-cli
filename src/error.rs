@@ -11,6 +11,7 @@ pub enum CliError {
     SessionExpired(String),
 
     #[error("Policy violation: {message}")]
+    #[allow(dead_code)] // Reserved for future policy validation
     PolicyViolation { message: String, details: String },
 
     #[error("Invalid session data: {0}")]
@@ -20,6 +21,7 @@ pub enum CliError {
     Storage(String),
 
     #[error("Network error: {0}")]
+    #[allow(dead_code)] // Reserved for network-related errors
     Network(String),
 
     #[error("Transaction failed: {0}")]
@@ -32,6 +34,7 @@ pub enum CliError {
     CallbackTimeout(u64),
 
     #[error("Server error: {0}")]
+    #[allow(dead_code)] // Reserved for server-related errors
     ServerError(String),
 
     #[error("API error: {0}")]

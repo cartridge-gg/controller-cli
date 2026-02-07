@@ -28,8 +28,10 @@ struct SessionRegistration {
     #[serde(default)]
     metadata_hash: String,
     #[serde(default)]
+    #[allow(dead_code)] // Part of deserialization schema but not used in code
     session_key_guid: String,
     #[serde(default)]
+    #[allow(dead_code)] // Part of deserialization schema but not used in code
     transaction_hash: Option<String>,
 }
 
@@ -72,7 +74,7 @@ pub async fn execute(
     })?;
 
     // Parse session registration
-    let mut registration: SessionRegistration = serde_json::from_str(&session_str)
+    let registration: SessionRegistration = serde_json::from_str(&session_str)
         .map_err(|e| CliError::InvalidSessionData(format!("Failed to parse JSON: {}", e)))?;
 
     // Load the stored keypair to get session key GUID
@@ -111,7 +113,7 @@ pub async fn execute(
         })?
     };
 
-    let metadata_hash = if registration.metadata_hash.is_empty() {
+    let _metadata_hash = if registration.metadata_hash.is_empty() {
         Felt::ZERO
     } else {
         Felt::from_hex(&registration.metadata_hash)

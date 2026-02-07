@@ -4,10 +4,10 @@ use crate::{
     output::OutputFormatter,
 };
 use account_sdk::{
-    account::session::{account::SessionAccount, hash::Session},
+    account::session::account::SessionAccount,
     provider::CartridgeJsonRpcProvider,
     signers::Signer,
-    storage::{filestorage::FileSystemBackend, Credentials, StorageBackend, StorageValue},
+    storage::{filestorage::FileSystemBackend, StorageBackend},
 };
 use serde::{Deserialize, Serialize};
 use starknet::{

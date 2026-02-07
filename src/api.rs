@@ -19,24 +19,24 @@ pub struct ControllerInfo {
     pub account_id: String,
 }
 
-/// Query session information from the Cartridge API
+/// Query session creation from the Cartridge API (long-polling)
 ///
-/// This is a placeholder implementation. The actual API endpoint needs to be implemented
-/// on the backend to return:
-/// - authorization: Vec<Felt> signature that proves owner approved this session
-/// - address: Account address
-/// - chain_id: StarkNet chain ID
-/// - expires_at: Unix timestamp when session expires
-/// - owner_signer: Full signer details (Starknet or Webauthn)
+/// This uses the `subscribeCreateSession` query which implements long-polling:
+/// - Backend holds the HTTP connection open for up to 2 minutes
+/// - Checks database periodically for session creation
+/// - Returns null if timeout, or SessionInfo if session is created
+///
+/// Despite the name, this is a **Query** not a Subscription.
 pub async fn query_session_info(
     api_url: &str,
     session_key_guid: &str,
 ) -> Result<Option<SessionInfo>> {
-    // Uses existing subscribeCreateSession query from controller-rs
-    // See: account_sdk/src/graphql/session/subscribe-create-session.graphql
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(130)) // Slightly longer than backend's 2min timeout
+        .build()
+        .map_err(|e| CliError::ApiError(format!("Failed to build HTTP client: {}", e)))?;
 
-    let client = reqwest::Client::new();
-
+    // This is a QUERY (not subscription) despite the name
     let query = r#"
         query SubscribeCreateSession($sessionKeyGuid: Felt!) {
             subscribeCreateSession(sessionKeyGuid: $sessionKeyGuid) {
@@ -146,7 +146,20 @@ impl SessionInfo {
 
     /// Convert chain_id string to Felt
     pub fn chain_id_as_felt(&self) -> Result<Felt> {
-        Felt::from_hex(&self.chain_id)
-            .map_err(|e| CliError::InvalidSessionData(format!("Invalid chain_id hex: {}", e)))
+        // Try hex first
+        if let Ok(felt) = Felt::from_hex(&self.chain_id) {
+            return Ok(felt);
+        }
+
+        // Try as short string (e.g., "SN_SEPOLIA")
+        if let Ok(felt) = starknet::core::utils::cairo_short_string_to_felt(&self.chain_id) {
+            return Ok(felt);
+        }
+
+        // Debug: show what we got
+        Err(CliError::InvalidSessionData(format!(
+            "Invalid chain_id format: '{}' (expected hex or short string)",
+            self.chain_id
+        )))
     }
 }

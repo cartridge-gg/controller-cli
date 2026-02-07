@@ -9,7 +9,6 @@ use account_sdk::storage::{
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
 use url::Url;
 
 #[derive(Serialize, Deserialize)]
@@ -74,7 +73,7 @@ pub async fn execute(
     };
 
     // Load policies from file if provided
-    let policies_json = if let Some(policy_file_path) = policy_file {
+    let (policies_json, parsed_policies) = if let Some(policy_file_path) = policy_file {
         let policy_content = std::fs::read_to_string(&policy_file_path)
             .map_err(|e| CliError::InvalidInput(format!("Failed to read policy file: {}", e)))?;
 
@@ -87,16 +86,48 @@ pub async fn execute(
             "contracts": {}
         });
 
+        // Also build Policy structures for storage
+        let mut policy_vec = Vec::new();
+
         if let Some(contracts) = policies.as_object_mut() {
             if let Some(contracts_obj) = contracts.get_mut("contracts") {
                 if let Some(contracts_map) = contracts_obj.as_object_mut() {
                     for (address, contract) in policy_file.contracts {
                         contracts_map.insert(
-                            address,
+                            address.clone(),
                             serde_json::json!({
                                 "methods": contract.methods
                             }),
                         );
+
+                        // Parse address and create Policy for each method
+                        let contract_address = starknet::core::types::Felt::from_hex(&address)
+                            .map_err(|e| {
+                                CliError::InvalidInput(format!(
+                                    "Invalid contract address {}: {}",
+                                    address, e
+                                ))
+                            })?;
+
+                        for method in &contract.methods {
+                            // Compute selector from entrypoint name
+                            let selector =
+                                starknet::core::utils::get_selector_from_name(&method.entrypoint)
+                                    .map_err(|e| {
+                                        CliError::InvalidInput(format!(
+                                            "Invalid entrypoint name {}: {}",
+                                            method.entrypoint, e
+                                        ))
+                                    })?;
+
+                            policy_vec.push(account_sdk::account::session::policy::Policy::Call(
+                                account_sdk::account::session::policy::CallPolicy {
+                                    contract_address,
+                                    selector,
+                                    authorized: Some(method.authorized),
+                                },
+                            ));
+                        }
                     }
                 }
             }
@@ -106,15 +137,18 @@ pub async fn execute(
             policies["messages"] = serde_json::json!(messages);
         }
 
-        serde_json::to_string(&policies)
-            .map_err(|e| CliError::InvalidInput(format!("Failed to serialize policies: {}", e)))?
+        let json = serde_json::to_string(&policies)
+            .map_err(|e| CliError::InvalidInput(format!("Failed to serialize policies: {}", e)))?;
+
+        (json, policy_vec)
     } else {
         // Default empty policies for wildcard session
-        serde_json::to_string(&serde_json::json!({
+        let json = serde_json::to_string(&serde_json::json!({
             "verified": false,
             "contracts": {}
         }))
-        .unwrap()
+        .unwrap();
+        (json, Vec::new())
     };
 
     // Build the authorization URL
@@ -134,31 +168,7 @@ pub async fn execute(
     // First, check if session already exists (idempotency)
     formatter.info("Checking for existing session...");
 
-    // Calculate session_key_guid from the public key
-    let session_key_guid = {
-        let pubkey_felt = starknet::core::types::Felt::from_hex(&public_key)
-            .map_err(|e| CliError::InvalidInput(format!("Invalid public key: {}", e)))?;
-        format!("0x{:x}", pubkey_felt)
-    };
-
-    // Check if session already exists
-    if let Some(session_info) =
-        api::query_session_info(&config.session.api_url, &session_key_guid).await?
-    {
-        formatter.info("Session already exists! Storing credentials...");
-
-        // Store the session directly
-        store_session_from_api(&mut backend, session_info, &public_key)?;
-
-        formatter.success(&serde_json::json!({
-            "message": "Session already registered and stored successfully",
-            "public_key": public_key,
-        }));
-
-        return Ok(());
-    }
-
-    // No existing session, show URL and start polling
+    // Show URL and start polling
     let output = RegisterOutput {
         authorization_url: authorization_url.clone(),
         public_key: public_key.clone(),
@@ -175,36 +185,64 @@ pub async fn execute(
         formatter.info("\nWaiting for authorization (timeout: 5 minutes)...");
     }
 
-    // Poll for session creation
-    let timeout_secs = 300; // 5 minutes
-    let poll_interval = Duration::from_secs(3); // Poll every 3 seconds
-    let start = Instant::now();
+    // Calculate session_key_guid for long-polling query
+    // GUID = poseidon_hash("Starknet Signer", public_key)
+    let session_key_guid = {
+        use starknet::macros::short_string;
+        use starknet_crypto::poseidon_hash;
+
+        let pubkey_felt = starknet::core::types::Felt::from_hex(&public_key)
+            .map_err(|e| CliError::InvalidInput(format!("Invalid public key: {}", e)))?;
+
+        let guid = poseidon_hash(short_string!("Starknet Signer"), pubkey_felt);
+        format!("0x{:x}", guid)
+    };
+
+    // Debug: show the session key guid
+    if !config.cli.json_output {
+        formatter.info(&format!("Session Key GUID: {}", session_key_guid));
+    }
+
+    // Query with long-polling (backend holds connection for ~2 minutes)
+    // Retry if backend times out without finding session
+    let max_attempts = 3; // 3 attempts × 2min = ~6 minutes total
+    let mut attempts = 0;
 
     loop {
-        // Check timeout
-        if start.elapsed().as_secs() >= timeout_secs {
-            return Err(CliError::CallbackTimeout(timeout_secs));
+        attempts += 1;
+
+        if !config.cli.json_output {
+            formatter.info(&format!("Polling attempt {}/{}...", attempts, max_attempts));
         }
 
-        // Query session info
-        if let Some(session_info) =
-            api::query_session_info(&config.session.api_url, &session_key_guid).await?
-        {
-            formatter.info("Authorization received! Storing session...");
+        match api::query_session_info(&config.session.api_url, &session_key_guid).await? {
+            Some(session_info) => {
+                formatter.info("Authorization received! Storing session...");
 
-            // Store the session
-            store_session_from_api(&mut backend, session_info, &public_key)?;
+                // Store the session with policies
+                store_session_from_api(
+                    &mut backend,
+                    session_info,
+                    &public_key,
+                    parsed_policies.clone(),
+                )?;
 
-            formatter.success(&serde_json::json!({
-                "message": "Session registered and stored successfully",
-                "public_key": public_key,
-            }));
+                formatter.success(&serde_json::json!({
+                    "message": "Session registered and stored successfully",
+                    "public_key": public_key,
+                }));
 
-            return Ok(());
+                return Ok(());
+            }
+            None => {
+                // Backend timed out without finding session
+                if attempts >= max_attempts {
+                    return Err(CliError::CallbackTimeout(max_attempts * 120)); // ~6 minutes
+                }
+                // Backend will retry automatically on next call
+                continue;
+            }
         }
-
-        // Wait before next poll
-        tokio::time::sleep(poll_interval).await;
     }
 }
 
@@ -213,10 +251,23 @@ fn store_session_from_api(
     backend: &mut FileSystemBackend,
     session_info: api::SessionInfo,
     public_key: &str,
+    policies: Vec<account_sdk::account::session::policy::Policy>,
 ) -> Result<()> {
     use account_sdk::{
         account::session::hash::Session,
-        storage::{ControllerMetadata, Credentials, Owner, SessionMetadata},
+        storage::{ControllerMetadata, Credentials, Owner, SessionMetadata, StorageValue},
+    };
+
+    // Load the private key from session_signer storage
+    let private_key = match backend.get("session_signer") {
+        Ok(Some(StorageValue::String(data))) => {
+            let credentials: Credentials = serde_json::from_str(&data)
+                .map_err(|e| CliError::InvalidSessionData(e.to_string()))?;
+            credentials.private_key
+        }
+        _ => {
+            return Err(CliError::NoSession);
+        }
     };
 
     // Parse authorization as Vec<Felt>
@@ -226,29 +277,35 @@ fn store_session_from_api(
     let address = session_info.address_as_felt()?;
     let chain_id = session_info.chain_id_as_felt()?;
 
-    // Calculate session_key_guid from public key
+    // Parse public key to create session signer
     let pubkey_felt = starknet::core::types::Felt::from_hex(public_key)
         .map_err(|e| CliError::InvalidInput(format!("Invalid public key: {}", e)))?;
-    let session_key_guid = pubkey_felt;
+
+    // Create StarknetSigner from public key (pubkey is already a Felt, no conversion needed)
+    use cainome_cairo_serde::NonZero;
+    let session_signer = account_sdk::abigen::controller::Signer::Starknet(
+        account_sdk::abigen::controller::StarknetSigner {
+            pubkey: NonZero::new(pubkey_felt)
+                .ok_or_else(|| CliError::InvalidInput("Invalid public key (zero)".to_string()))?,
+        },
+    );
+
+    // Use Session::new() which properly computes merkle root and proofs
+    let session = Session::new(
+        policies,
+        session_info.expires_at,
+        &session_signer,
+        starknet::core::types::Felt::ZERO, // guardian_key_guid
+    )
+    .map_err(|e| CliError::InvalidSessionData(format!("Failed to create session: {}", e)))?;
 
     // Create session metadata
     let session_metadata = SessionMetadata {
         credentials: Some(Credentials {
             authorization: authorization.clone(),
-            private_key: starknet::core::types::Felt::ZERO, // Will be filled from session_signer storage
+            private_key, // Use the actual private key from session_signer storage
         }),
-        session: Session {
-            inner: account_sdk::abigen::controller::Session {
-                expires_at: session_info.expires_at,
-                allowed_policies_root: starknet::core::types::Felt::ZERO, // TODO: Calculate from policies
-                metadata_hash: starknet::core::types::Felt::ZERO,
-                session_key_guid,
-                guardian_key_guid: starknet::core::types::Felt::ZERO,
-            },
-            requested_policies: vec![],
-            proved_policies: vec![],
-            metadata: "{}".to_string(),
-        },
+        session,
         max_fee: None,
         is_registered: true,
     };

@@ -35,8 +35,8 @@ pub struct CliConfig {
 
 fn default_storage_path() -> String {
     dirs::config_dir()
-        .map(|p| p.join("cartridge").to_string_lossy().to_string())
-        .unwrap_or_else(|| "~/.config/cartridge".to_string())
+        .map(|p| p.join("controller-cli").to_string_lossy().to_string())
+        .unwrap_or_else(|| "~/.config/controller-cli".to_string())
 }
 
 fn default_chain_id() -> String {
@@ -110,7 +110,7 @@ impl Config {
     pub fn config_path() -> anyhow::Result<PathBuf> {
         let config_dir = dirs::config_dir()
             .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?;
-        Ok(config_dir.join("cartridge").join("config.toml"))
+        Ok(config_dir.join("controller-cli").join("config.toml"))
     }
 
     pub fn merge_from_env(&mut self) {

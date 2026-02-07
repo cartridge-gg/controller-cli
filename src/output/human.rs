@@ -2,16 +2,14 @@ use crate::error::CliError;
 use crate::output::OutputFormatter;
 use colored::*;
 
-pub struct HumanFormatter {
-    use_colors: bool,
-}
+pub struct HumanFormatter;
 
 impl HumanFormatter {
     pub fn new(use_colors: bool) -> Self {
         if !use_colors {
             colored::control::set_override(false);
         }
-        Self { use_colors }
+        Self
     }
 
     fn format_success_symbol(&self) -> String {
