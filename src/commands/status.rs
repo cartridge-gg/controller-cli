@@ -1,8 +1,14 @@
-use crate::{config::Config, error::{CliError, Result}, output::OutputFormatter};
-use account_sdk::storage::{filestorage::FileSystemBackend, Credentials, StorageBackend, StorageValue};
+use crate::{
+    config::Config,
+    error::{CliError, Result},
+    output::OutputFormatter,
+};
+use account_sdk::storage::{
+    filestorage::FileSystemBackend, Credentials, StorageBackend, StorageValue,
+};
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use std::path::PathBuf;
-use chrono::{DateTime, Utc};
 
 #[derive(Serialize)]
 pub struct StatusOutput {
@@ -36,7 +42,8 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
             let credentials: Credentials = serde_json::from_str(&data)
                 .map_err(|e| CliError::InvalidSessionData(e.to_string()))?;
 
-            let signing_key = starknet::signers::SigningKey::from_secret_scalar(credentials.private_key);
+            let signing_key =
+                starknet::signers::SigningKey::from_secret_scalar(credentials.private_key);
             let verifying_key = signing_key.verifying_key();
 
             Some(KeypairInfo {
@@ -59,8 +66,8 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
             let expires_in = expires_at as i64 - now as i64;
             let is_expired = metadata.session.is_expired();
 
-            let expires_at_dt = DateTime::from_timestamp(expires_at as i64, 0)
-                .unwrap_or_else(|| Utc::now());
+            let expires_at_dt =
+                DateTime::from_timestamp(expires_at as i64, 0).unwrap_or_else(|| Utc::now());
 
             // Try to get account address from controller metadata
             let address = match backend.controller() {

@@ -7,12 +7,11 @@ use account_sdk::{
     abigen::controller::Signer as AbiSigner,
     account::session::hash::Session,
     storage::{
-        filestorage::FileSystemBackend, Credentials, SessionMetadata, StorageBackend,
-        StorageValue,
+        filestorage::FileSystemBackend, Credentials, SessionMetadata, StorageBackend, StorageValue,
     },
 };
-use cainome_cairo_serde::NonZero;
 use base64::{engine::general_purpose, Engine};
+use cainome_cairo_serde::NonZero;
 use serde::{Deserialize, Serialize};
 use starknet::core::types::Felt;
 use std::path::PathBuf;
@@ -107,8 +106,9 @@ pub async fn execute(
     let guardian_key_guid = if registration.guardian_key_guid.is_empty() {
         Felt::ZERO
     } else {
-        Felt::from_hex(&registration.guardian_key_guid)
-            .map_err(|e| CliError::InvalidSessionData(format!("Invalid guardian key GUID: {}", e)))?
+        Felt::from_hex(&registration.guardian_key_guid).map_err(|e| {
+            CliError::InvalidSessionData(format!("Invalid guardian key GUID: {}", e))
+        })?
     };
 
     let metadata_hash = if registration.metadata_hash.is_empty() {

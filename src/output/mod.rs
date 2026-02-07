@@ -1,8 +1,8 @@
-mod json;
 mod human;
+mod json;
 
-pub use json::JsonFormatter;
 pub use human::HumanFormatter;
+pub use json::JsonFormatter;
 
 use crate::error::CliError;
 use serde::Serialize;

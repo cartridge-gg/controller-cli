@@ -48,11 +48,7 @@ impl OutputFormatter for HumanFormatter {
     }
 
     fn error(&self, error: &CliError) {
-        eprintln!(
-            "{} {}",
-            self.format_error_symbol(),
-            "Error".red().bold()
-        );
+        eprintln!("{} {}", self.format_error_symbol(), "Error".red().bold());
         eprintln!("{}", error.to_string().red());
 
         if let Some(hint) = error.recovery_hint() {

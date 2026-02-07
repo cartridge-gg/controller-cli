@@ -85,11 +85,9 @@ pub async fn execute(
 
     // Check if session is expired
     if session_metadata.session.is_expired() {
-        let expires_at = chrono::DateTime::from_timestamp(
-            session_metadata.session.inner.expires_at as i64,
-            0,
-        )
-        .unwrap_or_else(|| chrono::Utc::now());
+        let expires_at =
+            chrono::DateTime::from_timestamp(session_metadata.session.inner.expires_at as i64, 0)
+                .unwrap_or_else(|| chrono::Utc::now());
 
         return Err(CliError::SessionExpired(
             expires_at.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
@@ -114,7 +112,8 @@ pub async fn execute(
     let authorization = credentials.authorization.clone();
 
     // Create provider
-    let provider = CartridgeJsonRpcProvider::new(url::Url::parse(&config.session.default_rpc_url).unwrap());
+    let provider =
+        CartridgeJsonRpcProvider::new(url::Url::parse(&config.session.default_rpc_url).unwrap());
 
     // Create session account using authorization
     let session_account = SessionAccount::new(

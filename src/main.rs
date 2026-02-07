@@ -104,20 +104,14 @@ async fn main() {
     let formatter = create_formatter(config.cli.json_output, config.cli.use_colors);
 
     let result = match cli.command {
-        Commands::GenerateKeypair => {
-            commands::generate::execute(&config, &*formatter).await
-        }
-        Commands::RegisterSession {
-            policy_file,
-        } => {
+        Commands::GenerateKeypair => commands::generate::execute(&config, &*formatter).await,
+        Commands::RegisterSession { policy_file } => {
             commands::register::execute(&config, &*formatter, policy_file).await
         }
         Commands::StoreSession {
             session_data,
             from_file,
-        } => {
-            commands::store::execute(&config, &*formatter, session_data, from_file).await
-        }
+        } => commands::store::execute(&config, &*formatter, session_data, from_file).await,
         Commands::Execute {
             contract,
             entrypoint,
@@ -138,12 +132,8 @@ async fn main() {
             )
             .await
         }
-        Commands::Status => {
-            commands::status::execute(&config, &*formatter).await
-        }
-        Commands::Clear { yes } => {
-            commands::clear::execute(&config, &*formatter, yes).await
-        }
+        Commands::Status => commands::status::execute(&config, &*formatter).await,
+        Commands::Clear { yes } => commands::clear::execute(&config, &*formatter, yes).await,
     };
 
     if let Err(e) = result {

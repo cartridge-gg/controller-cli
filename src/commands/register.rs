@@ -4,7 +4,9 @@ use crate::{
     error::{CliError, Result},
     output::OutputFormatter,
 };
-use account_sdk::storage::{filestorage::FileSystemBackend, Credentials, StorageBackend, StorageValue};
+use account_sdk::storage::{
+    filestorage::FileSystemBackend, Credentials, StorageBackend, StorageValue,
+};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -61,7 +63,8 @@ pub async fn execute(
             let credentials: Credentials = serde_json::from_str(&data)
                 .map_err(|e| CliError::InvalidSessionData(e.to_string()))?;
 
-            let signing_key = starknet::signers::SigningKey::from_secret_scalar(credentials.private_key);
+            let signing_key =
+                starknet::signers::SigningKey::from_secret_scalar(credentials.private_key);
             let verifying_key = signing_key.verifying_key();
             format!("0x{:x}", verifying_key.scalar())
         }
@@ -139,7 +142,9 @@ pub async fn execute(
     };
 
     // Check if session already exists
-    if let Some(session_info) = api::query_session_info(&config.session.api_url, &session_key_guid).await? {
+    if let Some(session_info) =
+        api::query_session_info(&config.session.api_url, &session_key_guid).await?
+    {
         formatter.info("Session already exists! Storing credentials...");
 
         // Store the session directly
@@ -157,7 +162,9 @@ pub async fn execute(
     let output = RegisterOutput {
         authorization_url: authorization_url.clone(),
         public_key: public_key.clone(),
-        message: "Open this URL in your browser to authorize the session. Waiting for authorization...".to_string(),
+        message:
+            "Open this URL in your browser to authorize the session. Waiting for authorization..."
+                .to_string(),
     };
 
     formatter.success(&output);
@@ -180,7 +187,9 @@ pub async fn execute(
         }
 
         // Query session info
-        if let Some(session_info) = api::query_session_info(&config.session.api_url, &session_key_guid).await? {
+        if let Some(session_info) =
+            api::query_session_info(&config.session.api_url, &session_key_guid).await?
+        {
             formatter.info("Authorization received! Storing session...");
 
             // Store the session
@@ -227,8 +236,9 @@ fn store_session_from_api(
     // Convert owner signer info to storage types
     let owner = match session_info.owner_signer {
         api::SignerInfo::Starknet { private_key } => {
-            let pk = starknet::core::types::Felt::from_hex(&private_key)
-                .map_err(|e| CliError::InvalidSessionData(format!("Invalid owner private key: {}", e)))?;
+            let pk = starknet::core::types::Felt::from_hex(&private_key).map_err(|e| {
+                CliError::InvalidSessionData(format!("Invalid owner private key: {}", e))
+            })?;
             Owner::Signer(Signer::Starknet(account_sdk::storage::StarknetSigner {
                 private_key: pk,
             }))

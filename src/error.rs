@@ -5,7 +5,9 @@ pub enum CliError {
     #[error("Session not found. Run 'controller-cli generate-keypair' and 'controller-cli register-session' first")]
     NoSession,
 
-    #[error("Session expired at {0}. Run 'controller-cli register-session' to create a new session")]
+    #[error(
+        "Session expired at {0}. Run 'controller-cli register-session' to create a new session"
+    )]
     SessionExpired(String),
 
     #[error("Policy violation: {message}")]

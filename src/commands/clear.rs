@@ -9,13 +9,20 @@ pub struct ClearOutput {
     pub cleared_path: String,
 }
 
-pub async fn execute(config: &Config, formatter: &dyn OutputFormatter, skip_confirm: bool) -> Result<()> {
+pub async fn execute(
+    config: &Config,
+    formatter: &dyn OutputFormatter,
+    skip_confirm: bool,
+) -> Result<()> {
     let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
     let mut backend = FileSystemBackend::new(storage_path.clone());
 
     if !skip_confirm && !config.cli.json_output {
         // In human mode, ask for confirmation
-        println!("This will delete all stored session data at: {}", storage_path.display());
+        println!(
+            "This will delete all stored session data at: {}",
+            storage_path.display()
+        );
         println!("Are you sure? (y/N): ");
 
         let mut input = String::new();

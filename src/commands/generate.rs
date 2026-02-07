@@ -1,5 +1,7 @@
 use crate::{config::Config, error::Result, output::OutputFormatter};
-use account_sdk::storage::{filestorage::FileSystemBackend, Credentials, StorageBackend, StorageValue};
+use account_sdk::storage::{
+    filestorage::FileSystemBackend, Credentials, StorageBackend, StorageValue,
+};
 use serde::Serialize;
 use starknet::signers::SigningKey;
 use std::path::PathBuf;
@@ -34,11 +36,9 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
     let credentials_json = serde_json::to_string(&credentials)
         .map_err(|e| crate::error::CliError::InvalidInput(e.to_string()))?;
 
-    backend.set(
-        "session_signer",
-        &StorageValue::String(credentials_json),
-    )
-    .map_err(|e| crate::error::CliError::Storage(e.to_string()))?;
+    backend
+        .set("session_signer", &StorageValue::String(credentials_json))
+        .map_err(|e| crate::error::CliError::Storage(e.to_string()))?;
 
     let output = KeypairOutput {
         public_key: public_key.clone(),

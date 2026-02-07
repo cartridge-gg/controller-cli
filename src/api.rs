@@ -151,9 +151,7 @@ pub async fn query_session_info(
         )));
     }
 
-    Ok(graphql_response
-        .data
-        .and_then(|data| data.session))
+    Ok(graphql_response.data.and_then(|data| data.session))
 }
 
 impl SessionInfo {
@@ -162,8 +160,9 @@ impl SessionInfo {
         self.authorization
             .iter()
             .map(|hex| {
-                Felt::from_hex(hex)
-                    .map_err(|e| CliError::InvalidSessionData(format!("Invalid authorization hex: {}", e)))
+                Felt::from_hex(hex).map_err(|e| {
+                    CliError::InvalidSessionData(format!("Invalid authorization hex: {}", e))
+                })
             })
             .collect()
     }
