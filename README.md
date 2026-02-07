@@ -14,9 +14,31 @@ This CLI tool enables automated execution of Starknet transactions through a hum
 
 This approach ensures security while enabling automation - the human operator maintains full control by authorizing specific contracts and methods through the browser.
 
+**For LLMs/AI Agents:** See [LLM_USAGE.md](LLM_USAGE.md) for a complete integration guide with JSON examples and error handling.
+
 ## Installation
 
+### Quick Install (Recommended)
+
+Install the latest release with a single command:
+
 ```bash
+curl -fsSL https://raw.githubusercontent.com/broody/controller-cli/main/install.sh | bash
+```
+
+This will download the appropriate binary for your platform (Linux/macOS, x86_64/ARM64) and install it to `~/.local/bin`.
+
+### Via Cargo (if you have Rust installed)
+
+```bash
+cargo install --git https://github.com/broody/controller-cli
+```
+
+### From Source
+
+```bash
+git clone https://github.com/broody/controller-cli.git
+cd controller-cli
 cargo build --release
 ```
 

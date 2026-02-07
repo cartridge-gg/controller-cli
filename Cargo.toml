@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Cartridge <engineering@cartridge.gg>"]
 description = "CLI for Cartridge Controller session management"
 license = "MIT"
-repository = "https://github.com/cartridge-gg/controller-cli"
+repository = "https://github.com/broody/controller-cli"
 
 [[bin]]
 name = "controller-cli"
