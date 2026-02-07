@@ -7,7 +7,7 @@ This guide provides instructions for LLMs (Large Language Models) to install and
 Run this single command to install:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/broody/controller-cli/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/broody/controller/main/install.sh | bash
 ```
 
 If the installation directory is not in PATH, add it:
@@ -19,7 +19,7 @@ export PATH="$PATH:$HOME/.local/bin"
 Verify installation:
 
 ```bash
-controller-cli --version
+controller --version
 ```
 
 ## Quick Start Workflow
@@ -27,7 +27,7 @@ controller-cli --version
 ### 1. Generate Keypair
 
 ```bash
-controller-cli generate-keypair --json
+controller generate-keypair --json
 ```
 
 Expected output:
@@ -42,7 +42,7 @@ Expected output:
 ### 2. Check Status
 
 ```bash
-controller-cli status --json
+controller status --json
 ```
 
 Expected output (no session):
@@ -83,7 +83,7 @@ Create a policy file `policy.json`:
 
 Register the session:
 ```bash
-controller-cli register-session policy.json --json
+controller register-session policy.json --json
 ```
 
 Expected output:
@@ -112,7 +112,7 @@ When authorization completes:
 
 **Single call:**
 ```bash
-controller-cli execute \
+controller execute \
   --contract 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
   --entrypoint transfer \
   --calldata 0xRECIPIENT_ADDRESS,0xAMOUNT_LOW,0xAMOUNT_HIGH \
@@ -136,7 +136,7 @@ Create `calls.json`:
 
 Execute:
 ```bash
-controller-cli execute --file calls.json --json
+controller execute --file calls.json --json
 ```
 
 Expected output:
@@ -152,7 +152,7 @@ Expected output:
 Add `--wait` flag to wait for transaction confirmation:
 
 ```bash
-controller-cli execute --file calls.json --wait --json
+controller execute --file calls.json --wait --json
 ```
 
 This will poll until the transaction is confirmed (default 300 second timeout).
@@ -177,22 +177,22 @@ Common errors:
 {
   "error_code": "NoSession",
   "message": "No keypair found",
-  "recovery_hint": "Run 'controller-cli generate-keypair' to create a keypair"
+  "recovery_hint": "Run 'controller generate-keypair' to create a keypair"
 }
 ```
 
-**Recovery:** Run `controller-cli generate-keypair --json`
+**Recovery:** Run `controller generate-keypair --json`
 
 ### SessionExpired
 ```json
 {
   "error_code": "SessionExpired",
   "message": "Session expired at 2025-01-01 00:00:00 UTC",
-  "recovery_hint": "Run 'controller-cli register-session' to create a new session"
+  "recovery_hint": "Run 'controller register-session' to create a new session"
 }
 ```
 
-**Recovery:** Run `controller-cli register-session policy.json --json`
+**Recovery:** Run `controller register-session policy.json --json`
 
 ### ManualExecutionRequired
 ```json
@@ -218,14 +218,14 @@ Common errors:
 
 ```bash
 # 1. Install
-curl -fsSL https://raw.githubusercontent.com/broody/controller-cli/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/broody/controller/main/install.sh | bash
 
 # 2. Check status
-controller-cli status --json
+controller status --json
 # Output: {"status": "no_session", ...}
 
 # 3. Generate keypair
-controller-cli generate-keypair --json
+controller generate-keypair --json
 # Output: {"public_key": "0x123...", ...}
 
 # 4. Create policy file
@@ -240,13 +240,13 @@ cat > policy.json << 'EOF'
 EOF
 
 # 5. Register session (user must authorize in browser)
-controller-cli register-session policy.json --json
+controller register-session policy.json --json
 # Output: {"authorization_url": "https://...", ...}
 # User opens URL and authorizes
 # Output: {"message": "Session registered and stored successfully", ...}
 
 # 6. Execute transaction
-controller-cli execute \
+controller execute \
   --contract 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
   --entrypoint transfer \
   --calldata 0xRECIPIENT,0x64,0x0 \
@@ -284,7 +284,7 @@ Starknet uses u256 for large amounts (like token transfers). These must be split
 
 ### Transfer STRK Tokens
 ```bash
-controller-cli execute \
+controller execute \
   --contract 0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d \
   --entrypoint transfer \
   --calldata 0xRECIPIENT_ADDRESS,0xAMOUNT,0x0 \
@@ -293,7 +293,7 @@ controller-cli execute \
 
 ### Approve Token Spending
 ```bash
-controller-cli execute \
+controller execute \
   --contract 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
   --entrypoint approve \
   --calldata 0xSPENDER_ADDRESS,0xAMOUNT,0x0 \
@@ -321,7 +321,7 @@ Create `multicall.json`:
 
 Execute:
 ```bash
-controller-cli execute --file multicall.json --wait --json
+controller execute --file multicall.json --wait --json
 ```
 
 ## Security Notes
@@ -334,6 +334,6 @@ controller-cli execute --file multicall.json --wait --json
 
 ## Support
 
-- Repository: https://github.com/broody/controller-cli
-- Issues: https://github.com/broody/controller-cli/issues
-- Documentation: https://github.com/broody/controller-cli
+- Repository: https://github.com/broody/controller
+- Issues: https://github.com/broody/controller/issues
+- Documentation: https://github.com/broody/controller

@@ -5,7 +5,7 @@ set -e
 # Usage: curl -fsSL https://raw.githubusercontent.com/cartridge-gg/controller/main/controller-cli/install.sh | bash
 
 REPO="broody/controller-cli"
-BINARY_NAME="controller-cli"
+BINARY_NAME="controller"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 
 # Detect platform

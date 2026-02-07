@@ -17,8 +17,8 @@ help:
 # Install to ~/.local/bin
 install: release
 	@mkdir -p ~/.local/bin
-	@cp target/release/controller-cli ~/.local/bin/
-	@echo "✅ Installed to ~/.local/bin/controller-cli"
+	@cp target/release/controller ~/.local/bin/
+	@echo "✅ Installed to ~/.local/bin/controller"
 	@echo ""
 	@echo "Make sure ~/.local/bin is in your PATH:"
 	@echo "  export PATH=\"\$$PATH:~/.local/bin\""

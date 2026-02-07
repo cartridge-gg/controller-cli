@@ -2,7 +2,7 @@
 
 ## Installation (One Command)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/broody/controller-cli/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/broody/controller/main/install.sh | bash
 ```
 
 ## Commands
@@ -19,15 +19,15 @@ curl -fsSL https://raw.githubusercontent.com/broody/controller-cli/main/install.
 
 ```bash
 # 1. Generate keypair
-controller-cli generate-keypair --json
+controller generate-keypair --json
 
 # 2. Register session (user must authorize in browser)
-controller-cli register-session policy.json --json
+controller register-session policy.json --json
 
 # 3. Execute transaction
-controller-cli execute --contract 0x... --entrypoint transfer --calldata 0x... --json
+controller execute --contract 0x... --entrypoint transfer --calldata 0x... --json
 # or
-controller-cli execute --file calls.json --json
+controller execute --file calls.json --json
 ```
 
 ## JSON Formats

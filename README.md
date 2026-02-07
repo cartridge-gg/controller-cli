@@ -23,7 +23,7 @@ This approach ensures security while enabling automation - the human operator ma
 Install the latest release with a single command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/broody/controller-cli/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/broody/controller/main/install.sh | bash
 ```
 
 This will download the appropriate binary for your platform (Linux/macOS, x86_64/ARM64) and install it to `~/.local/bin`.
@@ -31,25 +31,25 @@ This will download the appropriate binary for your platform (Linux/macOS, x86_64
 ### Via Cargo (if you have Rust installed)
 
 ```bash
-cargo install --git https://github.com/broody/controller-cli
+cargo install --git https://github.com/broody/controller
 ```
 
 ### From Source
 
 ```bash
-git clone https://github.com/broody/controller-cli.git
-cd controller-cli
+git clone https://github.com/broody/controller.git
+cd controller
 cargo build --release
 ```
 
-The binary will be at `target/release/controller-cli`.
+The binary will be at `target/release/controller`.
 
 ## Quick Start
 
 ### 1. Generate a Keypair
 
 ```bash
-controller-cli generate-keypair
+controller generate-keypair
 ```
 
 This creates and stores a new session keypair. The public key will be displayed.
@@ -57,7 +57,7 @@ This creates and stores a new session keypair. The public key will be displayed.
 ### 2. Check Status
 
 ```bash
-controller-cli status
+controller status
 ```
 
 Shows current session status, keypair info, and expiration details.
@@ -67,7 +67,7 @@ Shows current session status, keypair info, and expiration details.
 Generate an authorization URL and wait for authorization:
 
 ```bash
-controller-cli register-session examples/policies.json
+controller register-session examples/policies.json
 ```
 
 This will:
@@ -95,8 +95,8 @@ The session is now ready to use - no manual copy-paste needed!
 **Note:** The `store-session` command still exists for manual workflows or testing, but is not needed when using `register-session`:
 ```bash
 # Manual mode (not typically needed)
-controller-cli store-session <base64_session_data>
-controller-cli store-session --from-file session.txt
+controller store-session <base64_session_data>
+controller store-session --from-file session.txt
 ```
 
 ### 4. Execute Transactions
@@ -104,7 +104,7 @@ controller-cli store-session --from-file session.txt
 **Single call**:
 
 ```bash
-controller-cli execute \
+controller execute \
   --contract 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
   --entrypoint transfer \
   --calldata 0xrecipient,0x100,0x0
@@ -113,7 +113,7 @@ controller-cli execute \
 **Multiple calls from file** (see `examples/calls.json`):
 
 ```bash
-controller-cli execute --file examples/calls.json
+controller execute --file examples/calls.json
 ```
 
 Call file format:
@@ -132,7 +132,7 @@ Call file format:
 **Wait for confirmation**:
 
 ```bash
-controller-cli execute --file calls.json --wait --timeout 300
+controller execute --file calls.json --wait --timeout 300
 ```
 
 The execute command will:
@@ -146,7 +146,7 @@ The execute command will:
 ### 5. Clear Session
 
 ```bash
-controller-cli clear
+controller clear
 ```
 
 Removes all stored session data.
@@ -156,7 +156,7 @@ Removes all stored session data.
 All commands support `--json` flag for machine-readable output, useful for scripting and automation. Without this flag, commands display human-readable output.
 
 ```bash
-controller-cli status --json
+controller status --json
 ```
 
 Example JSON output format:
@@ -240,20 +240,20 @@ Here's how an automated system might use the CLI:
 
 ```bash
 # Check if session exists
-STATUS=$(controller-cli status --json)
+STATUS=$(controller status --json)
 
 # If no session, set one up
 if [ "$(echo $STATUS | jq -r '.status')" = "no_session" ]; then
   # Generate keypair
-  controller-cli generate-keypair --json
+  controller generate-keypair --json
 
   # Register session (this will block until authorized)
-  controller-cli register-session policies.json --json
+  controller register-session policies.json --json
   # User opens URL in browser and authorizes
 fi
 
 # Execute transaction
-controller-cli execute \
+controller execute \
   --contract 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
   --entrypoint transfer \
   --calldata 0xabc123,0x64,0x0 \
@@ -287,15 +287,15 @@ The automatic polling and session management means AI agents can handle the full
 User: "Send 100 STRK to 0xabc123"
 
 Agent: [Checks status]
-> controller-cli status --json
+> controller status --json
 > Result: {"status": "no_session"}
 
 Agent: [Generates keypair]
-> controller-cli generate-keypair --json
+> controller generate-keypair --json
 > Result: {"public_key": "0x78ad12..."}
 
 Agent: [Requests authorization and waits]
-> controller-cli register-session policies.json --json
+> controller register-session policies.json --json
 
 Agent: "Please open this URL to authorize the session:
        https://x.cartridge.gg/session?public_key=...
@@ -312,7 +312,7 @@ Agent: "Please open this URL to authorize the session:
 Agent: "Session authorized! Now executing the transfer..."
 
 Agent: [Executes transaction]
-> controller-cli execute \
+> controller execute \
     --contract 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
     --entrypoint transfer \
     --calldata 0xabc123,0x64,0x0 \
@@ -341,7 +341,7 @@ Example error:
   "status": "error",
   "error_code": "SessionExpired",
   "message": "Session expired at 2025-01-01 00:00:00 UTC",
-  "recovery_hint": "Run 'controller-cli register-session' to create a new session"
+  "recovery_hint": "Run 'controller register-session' to create a new session"
 }
 ```
 

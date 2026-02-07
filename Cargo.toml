@@ -8,7 +8,7 @@ license = "MIT"
 repository = "https://github.com/broody/controller-cli"
 
 [[bin]]
-name = "controller-cli"
+name = "controller"
 path = "src/main.rs"
 
 [dependencies]
