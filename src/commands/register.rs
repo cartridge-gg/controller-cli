@@ -147,7 +147,6 @@ pub async fn execute(
     url.query_pairs_mut()
         .append_pair("public_key", &public_key)
         .append_pair("redirect_uri", "https://x.cartridge.gg")
-        .append_pair("redirect_query_name", "startapp")
         .append_pair("policies", &policies_json)
         .append_pair("rpc_url", &config.session.default_rpc_url)
         .append_pair("mode", "cli"); // Tell keychain this is CLI mode (don't include session data in redirect)
