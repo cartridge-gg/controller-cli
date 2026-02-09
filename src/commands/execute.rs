@@ -170,7 +170,21 @@ pub async fn execute(
         },
     };
 
-    formatter.success(&output);
+    let chain_id = controller_metadata.chain_id;
+    let chain_name = starknet::core::utils::parse_cairo_short_string(&chain_id)
+        .unwrap_or_else(|_| format!("0x{:x}", chain_id));
+    let is_mainnet = chain_id
+        == starknet::core::utils::cairo_short_string_to_felt("SN_MAIN").unwrap_or_default();
+    let voyager_subdomain = if is_mainnet { "" } else { "sepolia." };
+
+    if config.cli.json_output {
+        formatter.success(&output);
+    } else {
+        formatter.info(&format!(
+            "Transaction: https://{}voyager.online/tx/{} (chain: {})",
+            voyager_subdomain, transaction_hash, chain_name
+        ));
+    }
 
     // Wait for transaction confirmation if requested
     if wait {

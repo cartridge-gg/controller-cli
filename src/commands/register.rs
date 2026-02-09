@@ -172,6 +172,7 @@ pub async fn execute(
     if config.cli.json_output {
         formatter.success(&output);
     } else {
+        formatter.info(&format!("Chain: {}", config.session.default_chain_id));
         formatter.info("Authorization URL:");
         println!("\n{}\n", display_url);
         formatter.info("Waiting for authorization (timeout: 5 minutes)...");
@@ -202,6 +203,8 @@ pub async fn execute(
             Some(session_info) => {
                 formatter.info("Authorization received! Storing session...");
 
+                let chain_id = session_info.chain_id.clone();
+
                 // Store the session with policies
                 store_session_from_api(
                     &mut backend,
@@ -214,9 +217,13 @@ pub async fn execute(
                     formatter.success(&serde_json::json!({
                         "message": "Session registered and stored successfully",
                         "public_key": public_key,
+                        "chain_id": chain_id,
                     }));
                 } else {
-                    formatter.info("Session registered and stored successfully.");
+                    formatter.info(&format!(
+                        "Session registered and stored successfully. (chain: {})",
+                        chain_id
+                    ));
                 }
 
                 return Ok(());
