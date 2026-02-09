@@ -8,7 +8,7 @@ This skill enables LLMs to manage Cartridge Controller sessions and execute Star
 
 ## Prerequisites
 
-- Controller CLI installed: `curl -fsSL https://raw.githubusercontent.com/broody/controller-cli/main/install.sh | bash`
+- Controller CLI installed: `curl -fsSL https://raw.githubusercontent.com/cartridge-gg/controller-cli/main/install.sh | bash`
 - User must authorize sessions via browser (one-time setup per session)
 
 ## When to Use

@@ -29,7 +29,7 @@ ln -s "$(pwd)/.claude/skills/controller-skill" ~/.cursor/skills/controller-skill
 
 1. **Install Controller CLI:**
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/broody/controller-cli/main/install.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/cartridge-gg/controller-cli/main/install.sh | bash
    ```
 
 2. **Verify Installation:**
@@ -134,6 +134,6 @@ You can create custom policy files for your specific contracts and methods.
 
 ## Support
 
-- Repository: https://github.com/broody/controller-cli
-- Issues: https://github.com/broody/controller-cli/issues
+- Repository: https://github.com/cartridge-gg/controller-cli
+- Issues: https://github.com/cartridge-gg/controller-cli/issues
 - Documentation: See `skill.md` for detailed tool documentation

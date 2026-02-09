@@ -23,7 +23,7 @@ This approach ensures security while enabling automation - the human operator ma
 Install the latest release with a single command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/broody/controller/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cartridge-gg/controller-cli/main/install.sh | bash
 ```
 
 This will download the appropriate binary for your platform (Linux/macOS, x86_64/ARM64) and install it to `~/.local/bin`.
@@ -31,14 +31,14 @@ This will download the appropriate binary for your platform (Linux/macOS, x86_64
 ### Via Cargo (if you have Rust installed)
 
 ```bash
-cargo install --git https://github.com/broody/controller
+cargo install --git https://github.com/cartridge-gg/controller-cli
 ```
 
 ### From Source
 
 ```bash
-git clone https://github.com/broody/controller.git
-cd controller
+git clone https://github.com/cartridge-gg/controller-cli.git
+cd controller-cli
 cargo build --release
 ```
 

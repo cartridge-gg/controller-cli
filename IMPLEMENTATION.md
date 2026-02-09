@@ -245,11 +245,11 @@ Once backend is implemented:
 
 ## Key Files
 
-- `/Users/broody/development/cartridge_gg/controller-cli/src/api.rs` - GraphQL client
-- `/Users/broody/development/cartridge_gg/controller-cli/src/commands/register.rs` - Polling and storage
-- `/Users/broody/development/cartridge_gg/controller-cli/src/commands/execute.rs` - Transaction execution
-- `/Users/broody/development/cartridge_gg/controller-cli/src/config.rs` - Configuration with api_url
-- `/Users/broody/development/cartridge_gg/controller-cli/examples/policies.json` - Example policy file
+- `src/api.rs` - GraphQL client
+- `src/commands/register.rs` - Polling and storage
+- `src/commands/execute.rs` - Transaction execution
+- `src/config.rs` - Configuration with api_url
+- `examples/policies.json` - Example policy file
 
 ## Dependencies Added
 

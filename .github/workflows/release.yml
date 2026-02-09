@@ -107,4 +107,4 @@ jobs:
           echo "✅ Release created: ${{ steps.tag.outputs.tag }}"
           echo ""
           echo "Install with:"
-          echo "curl -fsSL https://raw.githubusercontent.com/broody/controller-cli/main/install.sh | bash"
+          echo "curl -fsSL https://raw.githubusercontent.com/cartridge-gg/controller-cli/main/install.sh | bash"

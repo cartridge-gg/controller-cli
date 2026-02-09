@@ -8,7 +8,7 @@ This guide provides instructions for LLMs (Large Language Models) to install and
 
 ```bash
 # Install the skill
-git clone https://github.com/broody/controller-cli.git
+git clone https://github.com/cartridge-gg/controller-cli.git
 ln -s "$(pwd)/controller-cli/.claude/skills/controller-skill" ~/.claude/skills/controller-skill
 ```
 
@@ -37,7 +37,7 @@ If you prefer to use the CLI directly without the skill, follow the instructions
 Run this single command to install:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/broody/controller/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cartridge-gg/controller-cli/main/install.sh | bash
 ```
 
 If the installation directory is not in PATH, add it:
@@ -248,7 +248,7 @@ Common errors:
 
 ```bash
 # 1. Install
-curl -fsSL https://raw.githubusercontent.com/broody/controller/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cartridge-gg/controller-cli/main/install.sh | bash
 
 # 2. Check status
 controller status --json
@@ -371,7 +371,7 @@ For easier integration, use the MCP skill instead of manual CLI commands:
 
 ## Support
 
-- Repository: https://github.com/broody/controller-cli
-- Issues: https://github.com/broody/controller-cli/issues
-- Documentation: https://github.com/broody/controller-cli
+- Repository: https://github.com/cartridge-gg/controller-cli
+- Issues: https://github.com/cartridge-gg/controller-cli/issues
+- Documentation: https://github.com/cartridge-gg/controller-cli
 - Skill: [.claude/skills/controller-skill](./.claude/skills/controller-skill)

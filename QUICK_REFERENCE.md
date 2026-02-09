@@ -2,7 +2,7 @@
 
 ## Installation (One Command)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/broody/controller/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cartridge-gg/controller-cli/main/install.sh | bash
 ```
 
 ## Commands

@@ -4,7 +4,7 @@ set -e
 # Cartridge Controller CLI Installer
 # Usage: curl -fsSL https://raw.githubusercontent.com/cartridge-gg/controller/main/controller-cli/install.sh | bash
 
-REPO="broody/controller-cli"
+REPO="cartridge-gg/controller-cli"
 BINARY_NAME="controller"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 
