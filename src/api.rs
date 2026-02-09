@@ -2,6 +2,51 @@ use crate::error::{CliError, Result};
 use serde::{Deserialize, Serialize};
 use starknet::core::types::Felt;
 
+/// Shorten a URL via the Cartridge URL shortener service.
+///
+/// POSTs to `{api_base}/s` and returns the short URL on success.
+/// Returns `Err` on any failure so the caller can fall back to the original URL.
+pub async fn shorten_url(api_url: &str, long_url: &str) -> Result<String> {
+    // Derive base URL by stripping `/query` from the API URL
+    let api_base = api_url.trim_end_matches("/query").trim_end_matches('/');
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|e| CliError::ApiError(format!("Failed to build HTTP client: {}", e)))?;
+
+    #[derive(Serialize)]
+    struct ShortenRequest<'a> {
+        url: &'a str,
+    }
+
+    #[derive(Deserialize)]
+    struct ShortenResponse {
+        url: String,
+    }
+
+    let response = client
+        .post(format!("{}/s", api_base))
+        .json(&ShortenRequest { url: long_url })
+        .send()
+        .await
+        .map_err(|e| CliError::ApiError(format!("Failed to shorten URL: {}", e)))?;
+
+    if !response.status().is_success() {
+        return Err(CliError::ApiError(format!(
+            "URL shortener returned error status: {}",
+            response.status()
+        )));
+    }
+
+    let shorten_response: ShortenResponse = response
+        .json()
+        .await
+        .map_err(|e| CliError::ApiError(format!("Failed to parse shortener response: {}", e)))?;
+
+    Ok(shorten_response.url)
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SessionInfo {
     pub authorization: Vec<String>, // Hex-encoded Felt values

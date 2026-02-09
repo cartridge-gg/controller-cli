@@ -153,9 +153,16 @@ pub async fn execute(
 
     let authorization_url = url.to_string();
 
+    // Try to shorten the URL for a cleaner display
+    let short_url = api::shorten_url(&config.session.api_url, &authorization_url)
+        .await
+        .ok();
+
     // Show URL and start polling
+    let display_url = short_url.unwrap_or(authorization_url.clone());
+
     let output = RegisterOutput {
-        authorization_url: authorization_url.clone(),
+        authorization_url: display_url.clone(),
         public_key: public_key.clone(),
         message:
             "Open this URL in your browser to authorize the session. Waiting for authorization..."
@@ -166,8 +173,8 @@ pub async fn execute(
         formatter.success(&output);
     } else {
         formatter.info("Authorization URL:");
-        println!("\n{}\n", authorization_url);
-        formatter.info("\nWaiting for authorization (timeout: 5 minutes)...");
+        println!("\n{}\n", display_url);
+        formatter.info("Waiting for authorization (timeout: 5 minutes)...");
     }
 
     // Calculate session_key_guid for long-polling query
@@ -182,11 +189,6 @@ pub async fn execute(
         let guid = poseidon_hash(short_string!("Starknet Signer"), pubkey_felt);
         format!("0x{:x}", guid)
     };
-
-    // Debug: show the session key guid
-    if !config.cli.json_output {
-        formatter.info(&format!("Session Key GUID: {}", session_key_guid));
-    }
 
     // Query with long-polling (backend holds connection for ~2 minutes)
     // Retry if backend times out without finding session
@@ -208,10 +210,14 @@ pub async fn execute(
                     parsed_policies.clone(),
                 )?;
 
-                formatter.success(&serde_json::json!({
-                    "message": "Session registered and stored successfully",
-                    "public_key": public_key,
-                }));
+                if config.cli.json_output {
+                    formatter.success(&serde_json::json!({
+                        "message": "Session registered and stored successfully",
+                        "public_key": public_key,
+                    }));
+                } else {
+                    formatter.info("Session registered and stored successfully.");
+                }
 
                 return Ok(());
             }
