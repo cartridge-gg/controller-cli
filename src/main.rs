@@ -34,6 +34,10 @@ enum Commands {
     RegisterSession {
         /// Path to policy file (JSON)
         policy_file: String,
+
+        /// Force re-registration even if policies haven't changed
+        #[arg(long)]
+        force: bool,
     },
 
     /// Manually store session credentials from authorization
@@ -105,8 +109,8 @@ async fn main() {
 
     let result = match cli.command {
         Commands::GenerateKeypair => commands::generate::execute(&config, &*formatter).await,
-        Commands::RegisterSession { policy_file } => {
-            commands::register::execute(&config, &*formatter, policy_file).await
+        Commands::RegisterSession { policy_file, force } => {
+            commands::register::execute(&config, &*formatter, policy_file, force).await
         }
         Commands::StoreSession {
             session_data,
