@@ -327,7 +327,7 @@ Agent: "✅ Transfer submitted! Transaction hash: 0x789..."
 
 ## Security
 
-- Private keys stored securely in `~/.config/cartridge/`
+- Private keys stored securely in `~/.config/controller-cli/`
 - Sessions limit what contracts/methods can be called
 - Human authorization required for all sessions
 - Sessions expire automatically

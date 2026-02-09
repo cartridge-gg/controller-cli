@@ -98,7 +98,7 @@ You can create custom policy files for your specific contracts and methods.
 
 ## Security
 
-- Private keys stored securely in `~/.config/cartridge/`
+- Private keys stored securely in `~/.config/controller-cli/`
 - Human authorization required for all sessions
 - Sessions limit which contracts/methods can be called
 - Sessions expire automatically

@@ -54,6 +54,13 @@ controller generate-keypair
 
 This creates and stores a new session keypair. The public key will be displayed.
 
+**Security Note:** The private key is stored locally on your machine. Even if this key were to be compromised, the session is strictly scoped to:
+- **Specific contracts** you authorize (e.g., only the STRK token contract)
+- **Specific methods** on those contracts (e.g., only `transfer` and `approve`)
+- **Time-limited** access (sessions expire, typically after 7 days)
+
+This means a leaked session key cannot be used to access arbitrary contracts or methods, only those you explicitly authorized during session registration.
+
 ### 2. Check Status
 
 ```bash
@@ -218,11 +225,11 @@ Example JSON output formats:
 
 ### Config File
 
-Create `~/.config/cartridge/config.toml`:
+Create `~/.config/controller-cli/config.toml`:
 
 ```toml
 [session]
-storage_path = "~/.config/cartridge"
+storage_path = "~/.config/controller-cli"
 default_chain_id = "SN_SEPOLIA"
 default_rpc_url = "https://api.cartridge.gg/x/starknet/sepolia"
 keychain_url = "https://x.cartridge.gg"
@@ -424,14 +431,18 @@ See [IMPLEMENTATION.md](IMPLEMENTATION.md) for backend requirements and testing 
 
 ## Security
 
-- **Private keys** stored in `~/.config/cartridge/` with restricted permissions
-- **Human authorization** required via browser for all sessions
-- **Policy enforcement** at method-level access control
-- **Session expiration** automatically validated before each transaction
-- **No credential logging** - sensitive data never written to logs
-- **API polling** protected by rate limiting (prevents brute force)
-- **Time-limited access** - session queries only available for 15 minutes after creation
-- **Authorization signatures** cannot be used to execute transactions (require session private key)
+- **Private keys stored locally** - Session keys are stored in `~/.config/controller-cli/` with restricted permissions
+- **Limited blast radius** - Even if a session key is compromised, it can only:
+  - Access contracts you explicitly authorized (e.g., only STRK token)
+  - Call methods you explicitly authorized (e.g., only `transfer` and `approve`)
+  - Be used until the session expires (typically 7 days)
+- **Human authorization required** - Every session must be authorized via browser
+- **Policy enforcement** - Method-level access control prevents unauthorized calls
+- **Session expiration** - Automatically validated before each transaction
+- **No credential logging** - Sensitive data never written to logs
+- **Rate limiting** - API polling protected against brute force attacks
+- **Time-limited registration** - Session queries only available for 15 minutes after creation
+- **Separation of concerns** - Authorization signatures cannot execute transactions (require session private key)
 
 ## License
 

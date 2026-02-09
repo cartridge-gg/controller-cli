@@ -64,10 +64,17 @@ Expected output:
 ```json
 {
   "public_key": "0x...",
-  "stored_at": "~/.config/cartridge",
+  "stored_at": "~/.config/controller-cli",
   "message": "Keypair generated successfully. Use this public key for session registration."
 }
 ```
+
+**Security Note:** The private key is stored locally. Even if compromised, the resulting session is strictly scoped to:
+- Only the contracts you authorize (e.g., STRK token at 0x04718f5a...)
+- Only the methods you authorize (e.g., `transfer` and `approve`)
+- Only until the session expires (typically 7 days)
+
+A leaked session key cannot access arbitrary contracts or call unauthorized methods.
 
 ### 2. Check Status
 
@@ -394,10 +401,22 @@ controller execute --file multicall.json --wait --json
 
 ## Security Notes
 
-- Private keys stored in `~/.config/cartridge/` with restricted permissions
-- Sessions expire and must be renewed
-- Policies limit which contracts/methods can be called
+**Session Key Protection:**
+- Private keys are stored locally in `~/.config/controller-cli/` with restricted file permissions
+- Even if a session key is compromised, damage is limited because:
+  - **Contract scoping**: Only authorized contracts can be called (e.g., only STRK token at 0x04718f5a...)
+  - **Method scoping**: Only authorized methods can be called (e.g., only `transfer` and `approve`)
+  - **Time scoping**: Sessions expire (typically after 7 days) and must be re-authorized
+
+**Authorization Model:**
 - Human authorization required for all sessions (cannot be automated)
+- Sessions must be registered via browser before use
+- Expired sessions automatically rejected
+
+**Best Practices:**
+- Use specific policies (authorize only needed contracts/methods)
+- Keep sessions short-lived when possible
+- Re-authorize sessions when requirements change
 - All transactions are automatically subsidized on Sepolia testnet
 
 ## Recommended: Use the Skill
