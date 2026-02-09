@@ -62,6 +62,11 @@ controller status
 
 Shows current session status, keypair info, and expiration details.
 
+**Status States:**
+- `no_session` - No keypair exists (run `controller generate-keypair`)
+- `keypair_only` - Keypair exists but no registered session (run `controller register-session <policy.json>`)
+- `active` - Session registered and not expired (ready to execute transactions)
+
 ### 3. Register a Session
 
 Generate an authorization URL and wait for authorization:
@@ -159,11 +164,11 @@ All commands support `--json` flag for machine-readable output, useful for scrip
 controller status --json
 ```
 
-Example JSON output format:
+Example JSON output formats:
 
+**Active session:**
 ```json
 {
-  "status": "success",
   "data": {
     "status": "active",
     "session": {
@@ -177,7 +182,35 @@ Example JSON output format:
       "public_key": "0x...",
       "has_private_key": true
     }
-  }
+  },
+  "status": "success"
+}
+```
+
+**Keypair only (no session registered yet):**
+```json
+{
+  "data": {
+    "status": "keypair_only",
+    "session": null,
+    "keypair": {
+      "public_key": "0x...",
+      "has_private_key": true
+    }
+  },
+  "status": "success"
+}
+```
+
+**No keypair:**
+```json
+{
+  "data": {
+    "status": "no_session",
+    "session": null,
+    "keypair": null
+  },
+  "status": "success"
 }
 ```
 

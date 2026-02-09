@@ -75,11 +75,45 @@ Expected output:
 controller status --json
 ```
 
-Expected output (no session):
+**Status States:**
+- `no_session` - No keypair exists
+- `keypair_only` - Keypair exists but no registered session
+- `active` - Session registered and not expired
+
+**Expected outputs:**
+
+No keypair:
 ```json
 {
   "status": "no_session",
   "session": null,
+  "keypair": null
+}
+```
+
+Keypair only (after `generate-keypair`):
+```json
+{
+  "status": "keypair_only",
+  "session": null,
+  "keypair": {
+    "public_key": "0x...",
+    "has_private_key": true
+  }
+}
+```
+
+Active session (after `register-session`):
+```json
+{
+  "status": "active",
+  "session": {
+    "address": "0x...",
+    "expires_at": 1735689600,
+    "expires_in_seconds": 3600,
+    "expires_at_formatted": "2025-01-01 00:00:00 UTC",
+    "is_expired": false
+  },
   "keypair": {
     "public_key": "0x...",
     "has_private_key": true
@@ -250,15 +284,19 @@ Common errors:
 # 1. Install
 curl -fsSL https://raw.githubusercontent.com/cartridge-gg/controller-cli/main/install.sh | bash
 
-# 2. Check status
+# 2. Check status (no keypair yet)
 controller status --json
-# Output: {"status": "no_session", ...}
+# Output: {"status": "no_session", "session": null, "keypair": null}
 
 # 3. Generate keypair
 controller generate-keypair --json
 # Output: {"public_key": "0x123...", ...}
 
-# 4. Create policy file
+# 4. Check status again (keypair exists, no session)
+controller status --json
+# Output: {"status": "keypair_only", "session": null, "keypair": {...}}
+
+# 5. Create policy file
 cat > policy.json << 'EOF'
 {
   "contracts": {
@@ -269,13 +307,13 @@ cat > policy.json << 'EOF'
 }
 EOF
 
-# 5. Register session (user must authorize in browser)
+# 6. Register session (user must authorize in browser)
 controller register-session policy.json --json
 # Output: {"authorization_url": "https://...", ...}
 # User opens URL and authorizes
 # Output: {"message": "Session registered and stored successfully", ...}
 
-# 6. Execute transaction
+# 7. Execute transaction
 controller execute \
   --contract 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
   --entrypoint transfer \
