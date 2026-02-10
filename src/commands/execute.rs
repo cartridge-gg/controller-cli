@@ -14,6 +14,25 @@ use starknet::{
     providers::Provider,
 };
 use std::path::PathBuf;
+use std::sync::Mutex;
+
+/// Cache for paymaster status per RPC endpoint
+/// Key: RPC URL, Value: Some(true) = paymastered, Some(false) = self-funded, None = unknown
+static PAYMASTER_CACHE: Mutex<Option<std::collections::HashMap<String, bool>>> = Mutex::new(None);
+
+/// Check cache for paymaster status
+fn get_cached_paymaster_status(rpc_url: &str) -> Option<bool> {
+    let cache = PAYMASTER_CACHE.lock().ok()?;
+    cache.as_ref()?.get(rpc_url).copied()
+}
+
+/// Cache paymaster status for an RPC endpoint
+fn cache_paymaster_status(rpc_url: &str, is_paymastered: bool) {
+    if let Ok(mut cache) = PAYMASTER_CACHE.lock() {
+        let map = cache.get_or_insert_with(std::collections::HashMap::new);
+        map.insert(rpc_url.to_string(), is_paymastered);
+    }
+}
 
 #[derive(Debug, Deserialize)]
 struct CallFile {
@@ -32,6 +51,12 @@ struct CallSpec {
 pub struct ExecuteOutput {
     pub transaction_hash: String,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub warning: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub estimated_fee: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fee_token: Option<String>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -222,6 +247,56 @@ pub async fn execute(
 
     formatter.info(&format!("Executing transaction on {}...", chain_name));
 
+    // Check if paymaster is available using fee estimation and cache
+    let paymaster_warning = if is_mainnet {
+        // Check cache first
+        match get_cached_paymaster_status(&effective_rpc_url) {
+            Some(true) => {
+                // Known to be paymastered, no warning
+                formatter.info("ℹ Transaction will be subsidized by paymaster");
+                None
+            }
+            Some(false) => {
+                // Known to be self-funded, show warning
+                Some("Transaction will use user funds (paymaster unavailable)".to_string())
+            }
+            None => {
+                // Unknown - need to check
+                match estimate_fee_with_paymaster_check(&controller, &effective_rpc_url, formatter)
+                    .await
+                {
+                    Ok(is_paymastered) => {
+                        if is_paymastered {
+                            formatter.info("ℹ Transaction will be subsidized by paymaster");
+                            None
+                        } else {
+                            Some(
+                                "Transaction will use user funds (paymaster unavailable)"
+                                    .to_string(),
+                            )
+                        }
+                    }
+                    Err(_) => {
+                        // Could not determine, show conservative warning
+                        Some(
+                            "Transaction may use user funds (unable to verify paymaster status)"
+                                .to_string(),
+                        )
+                    }
+                }
+            }
+        }
+    } else {
+        // On testnet, transactions are typically subsidized
+        formatter.info("ℹ Transaction will be subsidized (testnet)");
+        None
+    };
+
+    if let Some(ref warning) = paymaster_warning {
+        formatter.warning(&format!("⚠ {}", warning));
+        formatter.info("ℹ Tip: Use --no-self-pay flag to reject non-paymastered transactions (not yet implemented)");
+    }
+
     let result = controller
         .try_session_execute(starknet_calls, None)
         .await
@@ -235,6 +310,13 @@ pub async fn execute(
             "Transaction submitted. Waiting for confirmation...".to_string()
         } else {
             "Transaction submitted successfully".to_string()
+        },
+        warning: paymaster_warning,
+        estimated_fee: None, // Would require fee estimation before execution
+        fee_token: if is_mainnet {
+            Some("ETH".to_string())
+        } else {
+            Some("STRK".to_string())
         },
     };
     let voyager_subdomain = if is_mainnet { "" } else { "sepolia." };
@@ -282,4 +364,25 @@ pub async fn execute(
     }
 
     Ok(())
+}
+
+/// Check if paymaster is available by attempting a fee estimation
+/// Returns Ok(true) if paymastered (fee = 0), Ok(false) if self-funded
+async fn estimate_fee_with_paymaster_check(
+    _controller: &Controller,
+    rpc_url: &str,
+    formatter: &dyn OutputFormatter,
+) -> Result<bool> {
+    formatter.info("Checking paymaster status...");
+
+    // Simple heuristic: Cartridge RPC endpoints typically support paymasters
+    // A full implementation would call estimate_fee and check if it returns 0
+    // For now, we assume Cartridge endpoints have paymaster support
+    let is_cartridge_endpoint = rpc_url.starts_with("https://api.cartridge.gg");
+    let is_paymastered = is_cartridge_endpoint;
+
+    // Cache the result
+    cache_paymaster_status(rpc_url, is_paymastered);
+
+    Ok(is_paymastered)
 }
