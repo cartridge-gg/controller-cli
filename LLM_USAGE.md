@@ -323,6 +323,62 @@ controller execute \
 
 This will poll until the transaction is confirmed (default 300 second timeout).
 
+## Paymaster Control (Fee Payment)
+
+By default, transactions attempt to use the paymaster (subsidized/free execution). If the paymaster is unavailable, the transaction **fails** rather than falling back to user-funded execution.
+
+### Default Behavior
+
+```bash
+controller execute \
+  --contract 0x... \
+  --entrypoint transfer \
+  --calldata 0x... \
+  --json
+```
+
+- Uses paymaster (free execution)
+- **Fails if paymaster unavailable** - no automatic fallback
+- Error message suggests using `--no-paymaster`
+
+**Error when paymaster fails:**
+```json
+{
+  "error_code": "TransactionFailed",
+  "message": "Paymaster execution failed: <error>. Use --no-paymaster to force self-pay"
+}
+```
+
+### Force Self-Pay (--no-paymaster)
+
+When you want to pay for the transaction yourself:
+
+```bash
+controller execute \
+  --contract 0x... \
+  --entrypoint transfer \
+  --calldata 0x... \
+  --no-paymaster \
+  --json
+```
+
+- Bypasses paymaster entirely
+- Estimates fee and executes with user funds
+- Message: "Executing transaction on SN_SEPOLIA without paymaster..."
+
+**Use cases for --no-paymaster:**
+- Paymaster is unavailable but transaction is urgent
+- User prefers to pay fees themselves
+- Testing self-pay flow
+
+### When to Use Each Mode
+
+| Scenario | Flag | Behavior |
+|----------|------|----------|
+| Default (recommended) | None | Free via paymaster, fails if unavailable |
+| Urgent transaction | `--no-paymaster` | User pays, always works |
+| Testing | `--no-paymaster` | Verify self-pay works |
+
 ## Error Handling
 
 All errors return JSON with this structure:

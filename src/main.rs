@@ -79,6 +79,10 @@ enum Commands {
         /// RPC URL to use (overrides config and stored session RPC)
         #[arg(long)]
         rpc_url: Option<String>,
+
+        /// Force self-pay (don't use paymaster)
+        #[arg(long)]
+        no_paymaster: bool,
     },
 
     /// Display current session status and information
@@ -128,6 +132,7 @@ async fn main() {
             wait,
             timeout,
             rpc_url,
+            no_paymaster,
         } => {
             commands::execute::execute(
                 &config,
@@ -139,6 +144,7 @@ async fn main() {
                 wait,
                 timeout,
                 rpc_url,
+                no_paymaster,
             )
             .await
         }
