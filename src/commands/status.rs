@@ -20,6 +20,7 @@ pub struct StatusOutput {
 #[derive(Serialize)]
 pub struct SessionInfo {
     pub address: String,
+    pub chain_id: String,
     pub expires_at: u64,
     pub expires_in_seconds: i64,
     pub expires_at_formatted: String,
@@ -80,9 +81,13 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
                     DateTime::from_timestamp(expires_at as i64, 0).unwrap_or_else(|| Utc::now());
 
                 let address = format!("0x{:x}", controller.address);
+                let chain_id =
+                    starknet::core::utils::parse_cairo_short_string(&controller.chain_id)
+                        .unwrap_or_else(|_| format!("0x{:x}", controller.chain_id));
 
                 Some(SessionInfo {
                     address,
+                    chain_id,
                     expires_at,
                     expires_in_seconds: expires_in,
                     expires_at_formatted: expires_at_dt.format("%Y-%m-%d %H:%M:%S UTC").to_string(),

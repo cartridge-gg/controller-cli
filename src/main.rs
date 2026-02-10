@@ -34,6 +34,10 @@ enum Commands {
     RegisterSession {
         /// Path to policy file (JSON)
         policy_file: String,
+
+        /// RPC URL to use (overrides config)
+        #[arg(long)]
+        rpc_url: Option<String>,
     },
 
     /// Manually store session credentials from authorization
@@ -71,6 +75,10 @@ enum Commands {
         /// Timeout in seconds when waiting
         #[arg(long, default_value = "300")]
         timeout: u64,
+
+        /// RPC URL to use (overrides config and stored session RPC)
+        #[arg(long)]
+        rpc_url: Option<String>,
     },
 
     /// Display current session status and information
@@ -104,9 +112,10 @@ async fn main() {
 
     let result = match cli.command {
         Commands::GenerateKeypair => commands::generate::execute(&config, &*formatter).await,
-        Commands::RegisterSession { policy_file } => {
-            commands::register::execute(&config, &*formatter, policy_file).await
-        }
+        Commands::RegisterSession {
+            policy_file,
+            rpc_url,
+        } => commands::register::execute(&config, &*formatter, policy_file, rpc_url).await,
         Commands::StoreSession {
             session_data,
             from_file,
@@ -118,6 +127,7 @@ async fn main() {
             file,
             wait,
             timeout,
+            rpc_url,
         } => {
             commands::execute::execute(
                 &config,
@@ -128,6 +138,7 @@ async fn main() {
                 file,
                 wait,
                 timeout,
+                rpc_url,
             )
             .await
         }

@@ -116,6 +116,7 @@ Active session (after `register-session`):
   "status": "active",
   "session": {
     "address": "0x...",
+    "chain_id": "SN_SEPOLIA",
     "expires_at": 1735689600,
     "expires_in_seconds": 3600,
     "expires_at_formatted": "2025-01-01 00:00:00 UTC",
@@ -218,6 +219,50 @@ Expected output:
   "message": "Transaction submitted successfully"
 }
 ```
+
+### Specifying Network with --rpc-url
+
+Both `register-session` and `execute` commands support the `--rpc-url` flag to specify which network to use. This flag **supersedes** the config.toml default RPC URL.
+
+**Supported Networks:**
+- Mainnet: `https://api.cartridge.gg/x/starknet/mainnet`
+- Sepolia: `https://api.cartridge.gg/x/starknet/sepolia`
+
+**Important:** Only Cartridge RPC endpoints are supported. Using non-Cartridge RPC URLs will result in an error.
+
+**Examples:**
+
+Register session on mainnet:
+```bash
+controller register-session policy.json \
+  --rpc-url https://api.cartridge.gg/x/starknet/mainnet \
+  --json
+```
+
+Execute transaction on mainnet:
+```bash
+controller execute \
+  --contract 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
+  --entrypoint transfer \
+  --calldata 0xdeadbeef,0xa,0x0 \
+  --rpc-url https://api.cartridge.gg/x/starknet/mainnet \
+  --json
+```
+
+**User Request Examples:**
+- "Send 10 STRK to 0xdeadbeef on mainnet" → Add `--rpc-url https://api.cartridge.gg/x/starknet/mainnet`
+- "Transfer tokens on sepolia" → Add `--rpc-url https://api.cartridge.gg/x/starknet/sepolia`
+- "Execute this on mainnet" → Add `--rpc-url https://api.cartridge.gg/x/starknet/mainnet`
+
+**Priority Order:**
+1. `--rpc-url` flag (highest priority)
+2. Stored session RPC URL (from registration)
+3. Config.toml default RPC URL (lowest priority)
+
+**Validation:**
+- When `--rpc-url` is provided, the CLI will validate the endpoint by querying its chain_id
+- For `execute`, the chain_id must match the session's registered chain_id
+- If validation fails, an error message will indicate the issue
 
 ### 5. Wait for Confirmation (Optional)
 
@@ -359,11 +404,23 @@ Starknet uses u256 for large amounts (like token transfers). These must be split
 ## Common Use Cases
 
 ### Transfer STRK Tokens
+
+On Sepolia (default):
 ```bash
 controller execute \
   --contract 0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d \
   --entrypoint transfer \
   --calldata 0xRECIPIENT_ADDRESS,0xAMOUNT,0x0 \
+  --json
+```
+
+On Mainnet:
+```bash
+controller execute \
+  --contract 0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d \
+  --entrypoint transfer \
+  --calldata 0xRECIPIENT_ADDRESS,0xAMOUNT,0x0 \
+  --rpc-url https://api.cartridge.gg/x/starknet/mainnet \
   --json
 ```
 

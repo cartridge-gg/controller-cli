@@ -44,6 +44,7 @@ pub async fn execute(
     file: Option<String>,
     wait: bool,
     timeout: u64,
+    rpc_url: Option<String>,
 ) -> Result<()> {
     // Parse calls from arguments or file
     let calls = if let Some(file_path) = file {
@@ -111,17 +112,69 @@ pub async fn execute(
     let signing_key = starknet::signers::SigningKey::from_secret_scalar(credentials.private_key);
     let owner = Owner::Signer(Signer::Starknet(signing_key));
 
-    // Use stored RPC URL from registration, fall back to config default
-    let rpc_url = match backend.get("session_rpc_url") {
-        Ok(Some(StorageValue::String(url))) => url,
-        _ => config.session.default_rpc_url.clone(),
-    };
+    // Priority: CLI flag > stored session RPC > config default
+    let effective_rpc_url = rpc_url
+        .clone()
+        .or_else(|| {
+            backend.get("session_rpc_url").ok().and_then(|v| match v {
+                Some(StorageValue::String(url)) => Some(url),
+                _ => None,
+            })
+        })
+        .unwrap_or_else(|| config.session.default_rpc_url.clone());
+
+    // If --rpc-url was provided, validate it's a Cartridge RPC endpoint
+    if let Some(ref url) = rpc_url {
+        if !url.starts_with("https://api.cartridge.gg") {
+            return Err(CliError::InvalidInput(
+                "Only Cartridge RPC endpoints are supported. Use: https://api.cartridge.gg/x/starknet/mainnet or https://api.cartridge.gg/x/starknet/sepolia".to_string()
+            ));
+        }
+    }
+
+    // If --rpc-url was provided, validate it and check chain_id matches session
+    if rpc_url.is_some() {
+        formatter.info("Validating RPC endpoint...");
+        let provider = starknet::providers::jsonrpc::JsonRpcClient::new(
+            starknet::providers::jsonrpc::HttpTransport::new(
+                url::Url::parse(&effective_rpc_url)
+                    .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {}", e)))?,
+            ),
+        );
+
+        match starknet::providers::Provider::chain_id(&provider).await {
+            Ok(rpc_chain_id) => {
+                // Check if RPC chain_id matches session chain_id
+                if rpc_chain_id != controller_metadata.chain_id {
+                    let rpc_chain_name =
+                        starknet::core::utils::parse_cairo_short_string(&rpc_chain_id)
+                            .unwrap_or_else(|_| format!("0x{:x}", rpc_chain_id));
+                    let session_chain_name = starknet::core::utils::parse_cairo_short_string(
+                        &controller_metadata.chain_id,
+                    )
+                    .unwrap_or_else(|_| format!("0x{:x}", controller_metadata.chain_id));
+
+                    return Err(CliError::InvalidInput(format!(
+                        "Chain ID mismatch: RPC endpoint is on {} but session is for {}",
+                        rpc_chain_name, session_chain_name
+                    )));
+                }
+                // Validation successful, continue
+            }
+            Err(e) => {
+                return Err(CliError::InvalidInput(format!(
+                    "RPC endpoint not responding: {}",
+                    e
+                )));
+            }
+        }
+    }
 
     // Create Controller with session storage for try_session_execute
     let mut controller = Controller::new(
         controller_metadata.username.clone(),
         controller_metadata.class_hash,
-        url::Url::parse(&rpc_url).unwrap(),
+        url::Url::parse(&effective_rpc_url).unwrap(),
         owner,
         controller_metadata.address,
         Some(backend),

@@ -54,6 +54,7 @@ pub async fn execute(
     config: &Config,
     formatter: &dyn OutputFormatter,
     policy_file: String,
+    rpc_url: Option<String>,
 ) -> Result<()> {
     // Load the stored keypair
     let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
@@ -169,6 +170,41 @@ pub async fn execute(
         }
     }
 
+    // Use CLI flag if provided, otherwise use config
+    let effective_rpc_url = rpc_url.as_ref().unwrap_or(&config.session.default_rpc_url);
+
+    // If --rpc-url was provided, validate it's a Cartridge RPC endpoint
+    if let Some(ref url) = rpc_url {
+        if !url.starts_with("https://api.cartridge.gg") {
+            return Err(CliError::InvalidInput(
+                "Only Cartridge RPC endpoints are supported. Use: https://api.cartridge.gg/x/starknet/mainnet or https://api.cartridge.gg/x/starknet/sepolia".to_string()
+            ));
+        }
+    }
+
+    // If --rpc-url was provided, validate it works by querying chain_id
+    if rpc_url.is_some() {
+        formatter.info("Validating RPC endpoint...");
+        let provider = starknet::providers::jsonrpc::JsonRpcClient::new(
+            starknet::providers::jsonrpc::HttpTransport::new(
+                url::Url::parse(effective_rpc_url)
+                    .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {}", e)))?,
+            ),
+        );
+
+        match starknet::providers::Provider::chain_id(&provider).await {
+            Ok(_chain_id) => {
+                // Validation successful, continue
+            }
+            Err(e) => {
+                return Err(CliError::InvalidInput(format!(
+                    "RPC endpoint not responding: {}",
+                    e
+                )));
+            }
+        }
+    }
+
     // Build the authorization URL
     let mut url = Url::parse(&format!("{}/session", config.session.keychain_url))
         .map_err(|e| CliError::InvalidInput(format!("Invalid keychain URL: {}", e)))?;
@@ -177,7 +213,7 @@ pub async fn execute(
         .append_pair("public_key", &public_key)
         .append_pair("redirect_uri", "https://x.cartridge.gg")
         .append_pair("policies", &policies_json)
-        .append_pair("rpc_url", &config.session.default_rpc_url)
+        .append_pair("rpc_url", effective_rpc_url)
         .append_pair("mode", "cli"); // Tell keychain this is CLI mode (don't include session data in redirect)
 
     let authorization_url = url.to_string();
@@ -248,7 +284,7 @@ pub async fn execute(
                 backend
                     .set(
                         "session_rpc_url",
-                        &StorageValue::String(config.session.default_rpc_url.clone()),
+                        &StorageValue::String(effective_rpc_url.clone()),
                     )
                     .map_err(|e| CliError::Storage(e.to_string()))?;
 
