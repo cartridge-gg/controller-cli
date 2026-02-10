@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default)]
     pub session: SessionConfig,
@@ -81,15 +81,6 @@ impl Default for CliConfig {
             json_output: false,
             use_colors: default_true(),
             callback_timeout_seconds: default_callback_timeout(),
-        }
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            session: SessionConfig::default(),
-            cli: CliConfig::default(),
         }
     }
 }

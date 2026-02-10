@@ -165,8 +165,8 @@ pub async fn execute(
         .set_controller(&chain_id, address, controller_metadata)
         .map_err(|e| CliError::Storage(e.to_string()))?;
 
-    let expires_at_dt = chrono::DateTime::from_timestamp(expires_at as i64, 0)
-        .unwrap_or_else(|| chrono::Utc::now());
+    let expires_at_dt =
+        chrono::DateTime::from_timestamp(expires_at as i64, 0).unwrap_or_else(chrono::Utc::now);
 
     let output = StoreOutput {
         message: "Session stored successfully".to_string(),
