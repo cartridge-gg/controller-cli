@@ -220,6 +220,13 @@ Expected output:
 }
 ```
 
+**Important - Transaction Explorer Links:**
+When displaying transaction hashes to users, **always use Voyager** as the block explorer:
+- **Mainnet**: `https://voyager.online/tx/0x...`
+- **Sepolia**: `https://sepolia.voyager.online/tx/0x...`
+
+**Never use** Starkscan or other explorers. Voyager is the preferred explorer for Cartridge Controller transactions.
+
 ### Specifying Network with --rpc-url
 
 Both `register-session` and `execute` commands support the `--rpc-url` flag to specify which network to use. This flag **supersedes** the config.toml default RPC URL.
@@ -387,6 +394,7 @@ controller execute \
 8. **Validate addresses** before including in calldata (must be 32-byte hex with 0x prefix)
 9. **Handle BigInt amounts** correctly (split into low/high for u256)
 10. **Set appropriate timeouts** for `--wait` flag based on network conditions
+11. **Always use Voyager for transaction links** - Format as `https://voyager.online/tx/0x...` (mainnet) or `https://sepolia.voyager.online/tx/0x...` (sepolia). Never use Starkscan.
 
 ## Transaction Amounts (u256 handling)
 
