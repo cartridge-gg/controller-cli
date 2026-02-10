@@ -7,7 +7,7 @@ use account_sdk::storage::{
     filestorage::FileSystemBackend, Credentials, StorageBackend, StorageValue,
 };
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Serialize)]
@@ -25,6 +25,29 @@ pub struct SessionInfo {
     pub expires_in_seconds: i64,
     pub expires_at_formatted: String,
     pub is_expired: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policies: Option<PolicyInfo>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct PolicyInfo {
+    pub contracts: std::collections::HashMap<String, ContractPolicy>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ContractPolicy {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub methods: Vec<MethodPolicy>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct MethodPolicy {
+    pub name: String,
+    pub entrypoint: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub authorized: bool,
 }
 
 #[derive(Serialize)]
@@ -85,6 +108,18 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
                     starknet::core::utils::parse_cairo_short_string(&controller.chain_id)
                         .unwrap_or_else(|_| format!("0x{:x}", controller.chain_id));
 
+                // Try to load stored policies
+                let policies = backend
+                    .get("session_policies")
+                    .ok()
+                    .flatten()
+                    .and_then(|v| match v {
+                        StorageValue::String(data) => {
+                            serde_json::from_str::<PolicyInfo>(&data).ok()
+                        }
+                        _ => None,
+                    });
+
                 Some(SessionInfo {
                     address,
                     chain_id,
@@ -92,6 +127,7 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
                     expires_in_seconds: expires_in,
                     expires_at_formatted: expires_at_dt.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
                     is_expired,
+                    policies,
                 })
             }
             _ => None,

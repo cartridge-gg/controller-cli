@@ -18,6 +18,12 @@ pub struct PolicyFile {
     pub messages: Option<Vec<serde_json::Value>>,
 }
 
+// Simplified policy storage for status command
+#[derive(Serialize, Deserialize)]
+pub struct PolicyStorage {
+    pub contracts: std::collections::HashMap<String, ContractPolicy>,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ContractPolicy {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -286,6 +292,16 @@ pub async fn execute(
                         "session_rpc_url",
                         &StorageValue::String(effective_rpc_url.clone()),
                     )
+                    .map_err(|e| CliError::Storage(e.to_string()))?;
+
+                // Store policies for display in status command
+                let policies_storage = PolicyStorage {
+                    contracts: policy_file.contracts.clone(),
+                };
+                let policies_json = serde_json::to_string(&policies_storage)
+                    .map_err(|e| CliError::Storage(format!("Failed to serialize policies: {}", e)))?;
+                backend
+                    .set("session_policies", &StorageValue::String(policies_json))
                     .map_err(|e| CliError::Storage(e.to_string()))?;
 
                 if config.cli.json_output {
