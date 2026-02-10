@@ -97,7 +97,7 @@ pub async fn execute(
     if session_metadata.session.is_expired() {
         let expires_at =
             chrono::DateTime::from_timestamp(session_metadata.session.inner.expires_at as i64, 0)
-                .unwrap_or_else(|| chrono::Utc::now());
+                .unwrap_or_else(chrono::Utc::now);
 
         return Err(CliError::SessionExpired(
             expires_at.format("%Y-%m-%d %H:%M:%S UTC").to_string(),

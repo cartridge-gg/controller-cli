@@ -101,7 +101,7 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
                 let is_expired = metadata.session.is_expired();
 
                 let expires_at_dt =
-                    DateTime::from_timestamp(expires_at as i64, 0).unwrap_or_else(|| Utc::now());
+                    DateTime::from_timestamp(expires_at as i64, 0).unwrap_or_else(Utc::now);
 
                 let address = format!("0x{:x}", controller.address);
                 let chain_id =
