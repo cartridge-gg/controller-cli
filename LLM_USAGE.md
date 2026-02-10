@@ -161,13 +161,14 @@ Expected output:
 ```json
 {
   "authorization_url": "https://x.cartridge.gg/session?public_key=0x...&policies=...",
+  "short_url": "https://api.cartridge.gg/s/abc123",
   "public_key": "0x...",
   "message": "Open this URL in your browser to authorize the session. Waiting for authorization..."
 }
 ```
 
 **Important:**
-1. Display the `authorization_url` to the user
+1. Display the `short_url` (if present) to the user, otherwise fall back to `authorization_url`
 2. Ask them to open it in their browser and authorize
 3. The command will automatically wait and store the session when authorized (up to 6 minutes)
 

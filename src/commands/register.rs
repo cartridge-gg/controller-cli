@@ -44,6 +44,8 @@ fn default_authorized() -> bool {
 #[derive(Serialize)]
 pub struct RegisterOutput {
     pub authorization_url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub short_url: Option<String>,
     pub public_key: String,
     pub message: String,
 }
@@ -52,7 +54,6 @@ pub async fn execute(
     config: &Config,
     formatter: &dyn OutputFormatter,
     policy_file: String,
-    force: bool,
 ) -> Result<()> {
     // Load the stored keypair
     let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
@@ -141,26 +142,27 @@ pub async fn execute(
         .map_err(|e| CliError::InvalidInput(format!("Failed to serialize policies: {}", e)))?;
     let parsed_policies = policy_vec;
 
-    // Check if we can skip re-registration
-    if !force {
-        if let Ok(Some(StorageValue::String(stored_json))) = backend.get("session_policies") {
-            if let Ok(stored_policies) = serde_json::from_str::<Vec<account_sdk::account::session::policy::Policy>>(&stored_json) {
-                if stored_policies == parsed_policies {
-                    // Check if session is still active
-                    let controller_metadata = backend.controller().ok().flatten();
-                    if let Some(controller) = &controller_metadata {
-                        let session_key = format!(
-                            "@cartridge/session/0x{:x}/0x{:x}",
-                            controller.address, controller.chain_id
-                        );
-                        if let Ok(Some(metadata)) = backend.session(&session_key) {
-                            if !metadata.session.is_expired() {
-                                formatter.info("Session already active with matching policies. Use --force to re-register.");
-                                return Ok(());
-                            }
-                        }
-                    }
+    // Check if there's an active unexpired session for the same keypair
+    let controller_metadata = backend.controller().ok().flatten();
+    if let Some(controller) = &controller_metadata {
+        let session_key = format!(
+            "@cartridge/session/0x{:x}/0x{:x}",
+            controller.address, controller.chain_id
+        );
+        if let Ok(Some(metadata)) = backend.session(&session_key) {
+            if !metadata.session.is_expired()
+                && metadata.session.inner.session_key_guid == {
+                    use starknet::macros::short_string;
+                    use starknet_crypto::poseidon_hash;
+
+                    let pubkey_felt = starknet::core::types::Felt::from_hex(&public_key)
+                        .unwrap_or_default();
+                    poseidon_hash(short_string!("Starknet Signer"), pubkey_felt)
                 }
+            {
+                formatter.warning("Active session exists for this keypair. A session keypair can only be registered once.");
+                formatter.info("Run 'controller generate-keypair' to create a new keypair, then re-register.");
+                return Ok(());
             }
         }
     }
@@ -184,10 +186,11 @@ pub async fn execute(
         .ok();
 
     // Show URL and start polling
-    let display_url = short_url.unwrap_or(authorization_url.clone());
+    let display_url = short_url.as_deref().unwrap_or(&authorization_url);
 
     let output = RegisterOutput {
-        authorization_url: display_url.clone(),
+        authorization_url: authorization_url.clone(),
+        short_url: short_url.clone(),
         public_key: public_key.clone(),
         message:
             "Open this URL in your browser to authorize the session. Waiting for authorization..."
@@ -237,13 +240,6 @@ pub async fn execute(
                     &public_key,
                     parsed_policies.clone(),
                 )?;
-
-                // Store policies for future comparison
-                let policies_json = serde_json::to_string(&parsed_policies)
-                    .map_err(|e| CliError::InvalidInput(format!("Failed to serialize policies: {}", e)))?;
-                backend
-                    .set("session_policies", &StorageValue::String(policies_json))
-                    .map_err(|e| CliError::Storage(e.to_string()))?;
 
                 if config.cli.json_output {
                     formatter.success(&serde_json::json!({
