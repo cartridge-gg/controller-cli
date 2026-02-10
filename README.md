@@ -94,15 +94,15 @@ Simply open the displayed URL in your browser and authorize - the CLI will handl
 ```
 Authorization URL:
 
-https://x.cartridge.gg/session?public_key=0x...&policies=...
+https://api.cartridge.gg/s/abc123
 
 Waiting for authorization (timeout: 5 minutes)...
-Session Key GUID: 0x...
-Authorization received! Storing session...
-✅ Session registered and stored successfully
+Session registered and stored successfully.
 ```
 
 The session is now ready to use - no manual copy-paste needed!
+
+**Note:** If you already have an active session, you'll need to generate a new keypair before re-registering (a session keypair can only be registered once).
 
 **Note:** The `store-session` command still exists for manual workflows or testing, but is not needed when using `register-session`:
 ```bash
@@ -150,9 +150,9 @@ controller execute --file calls.json --wait --timeout 300
 The execute command will:
 - Load and validate your session (check expiration)
 - Create a Controller from stored credentials
-- Automatically attempt subsidized execution via `execute_from_outside` (falls back to regular execution if not supported)
-- Execute the transaction on Starknet
-- Return the transaction hash
+- Use the RPC URL saved during session registration
+- Execute the transaction on Starknet (auto-subsidized when possible)
+- Return the transaction hash with a Voyager link
 - Optionally wait for confirmation (with `--wait` flag)
 
 ### 5. Clear Session
@@ -338,7 +338,7 @@ Agent: [Requests authorization and waits]
 > controller register-session policies.json --json
 
 Agent: "Please open this URL to authorize the session:
-       https://x.cartridge.gg/session?public_key=...
+       https://api.cartridge.gg/s/abc123
 
        Waiting for authorization..."
 
@@ -346,7 +346,8 @@ Agent: "Please open this URL to authorize the session:
 
 > Result: {
     "message": "Session registered and stored successfully",
-    "public_key": "0x78ad12..."
+    "public_key": "0x78ad12...",
+    "chain_id": "SN_MAIN"
   }
 
 Agent: "Session authorized! Now executing the transfer..."

@@ -82,7 +82,6 @@ enum Commands {
         #[arg(long)]
         yes: bool,
     },
-
 }
 
 #[tokio::main]

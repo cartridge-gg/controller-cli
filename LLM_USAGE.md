@@ -317,7 +317,7 @@ EOF
 
 # 6. Register session (user must authorize in browser)
 controller register-session policy.json --json
-# Output: {"authorization_url": "https://...", ...}
+# Output: {"authorization_url": "https://...", "short_url": "https://api.cartridge.gg/s/abc123", ...}
 # User opens URL and authorizes
 # Output: {"message": "Session registered and stored successfully", ...}
 

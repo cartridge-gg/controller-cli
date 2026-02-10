@@ -155,13 +155,15 @@ pub async fn execute(
                     use starknet::macros::short_string;
                     use starknet_crypto::poseidon_hash;
 
-                    let pubkey_felt = starknet::core::types::Felt::from_hex(&public_key)
-                        .unwrap_or_default();
+                    let pubkey_felt =
+                        starknet::core::types::Felt::from_hex(&public_key).unwrap_or_default();
                     poseidon_hash(short_string!("Starknet Signer"), pubkey_felt)
                 }
             {
                 formatter.warning("Active session exists for this keypair. A session keypair can only be registered once.");
-                formatter.info("Run 'controller generate-keypair' to create a new keypair, then re-register.");
+                formatter.info(
+                    "Run 'controller generate-keypair' to create a new keypair, then re-register.",
+                );
                 return Ok(());
             }
         }
@@ -229,8 +231,6 @@ pub async fn execute(
 
         match api::query_session_info(&config.session.api_url, &session_key_guid).await? {
             Some(session_info) => {
-                formatter.info("Authorization received! Storing session...");
-
                 let chain_id = session_info.chain_id.clone();
 
                 // Store the session with policies
@@ -241,6 +241,17 @@ pub async fn execute(
                     parsed_policies.clone(),
                 )?;
 
+                // Store chain_id and RPC URL for status/execute
+                backend
+                    .set("session_chain_id", &StorageValue::String(chain_id.clone()))
+                    .map_err(|e| CliError::Storage(e.to_string()))?;
+                backend
+                    .set(
+                        "session_rpc_url",
+                        &StorageValue::String(config.session.default_rpc_url.clone()),
+                    )
+                    .map_err(|e| CliError::Storage(e.to_string()))?;
+
                 if config.cli.json_output {
                     formatter.success(&serde_json::json!({
                         "message": "Session registered and stored successfully",
@@ -248,10 +259,7 @@ pub async fn execute(
                         "chain_id": chain_id,
                     }));
                 } else {
-                    formatter.info(&format!(
-                        "Session registered and stored successfully. (chain: {})",
-                        chain_id
-                    ));
+                    formatter.info("Session registered and stored successfully.");
                 }
 
                 return Ok(());

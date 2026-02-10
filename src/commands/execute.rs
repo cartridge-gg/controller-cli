@@ -6,7 +6,7 @@ use crate::{
 use account_sdk::{
     controller::Controller,
     signers::{Owner, Signer},
-    storage::{filestorage::FileSystemBackend, StorageBackend},
+    storage::{filestorage::FileSystemBackend, StorageBackend, StorageValue},
 };
 use serde::{Deserialize, Serialize};
 use starknet::{
@@ -111,11 +111,17 @@ pub async fn execute(
     let signing_key = starknet::signers::SigningKey::from_secret_scalar(credentials.private_key);
     let owner = Owner::Signer(Signer::Starknet(signing_key));
 
+    // Use stored RPC URL from registration, fall back to config default
+    let rpc_url = match backend.get("session_rpc_url") {
+        Ok(Some(StorageValue::String(url))) => url,
+        _ => config.session.default_rpc_url.clone(),
+    };
+
     // Create Controller with session storage for try_session_execute
     let mut controller = Controller::new(
         controller_metadata.username.clone(),
         controller_metadata.class_hash,
-        url::Url::parse(&config.session.default_rpc_url).unwrap(),
+        url::Url::parse(&rpc_url).unwrap(),
         owner,
         controller_metadata.address,
         Some(backend),
@@ -150,10 +156,19 @@ pub async fn execute(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    formatter.info("Executing transaction with try_session_execute (auto-subsidized)...");
+    let chain_name = match controller.provider.chain_id().await {
+        Ok(felt) => starknet::core::utils::parse_cairo_short_string(&felt)
+            .unwrap_or_else(|_| format!("0x{:x}", felt)),
+        Err(_) => {
+            let chain_id = controller_metadata.chain_id;
+            starknet::core::utils::parse_cairo_short_string(&chain_id)
+                .unwrap_or_else(|_| format!("0x{:x}", chain_id))
+        }
+    };
+    let is_mainnet = chain_name == "SN_MAIN";
 
-    // Use try_session_execute which automatically tries execute_from_outside first (subsidized)
-    // Falls back to regular execute if paymaster not supported
+    formatter.info(&format!("Executing transaction on {}...", chain_name));
+
     let result = controller
         .try_session_execute(starknet_calls, None)
         .await
@@ -169,20 +184,14 @@ pub async fn execute(
             "Transaction submitted successfully".to_string()
         },
     };
-
-    let chain_id = controller_metadata.chain_id;
-    let chain_name = starknet::core::utils::parse_cairo_short_string(&chain_id)
-        .unwrap_or_else(|_| format!("0x{:x}", chain_id));
-    let is_mainnet = chain_id
-        == starknet::core::utils::cairo_short_string_to_felt("SN_MAIN").unwrap_or_default();
     let voyager_subdomain = if is_mainnet { "" } else { "sepolia." };
 
     if config.cli.json_output {
         formatter.success(&output);
     } else {
         formatter.info(&format!(
-            "Transaction: https://{}voyager.online/tx/{} (chain: {})",
-            voyager_subdomain, transaction_hash, chain_name
+            "Transaction: https://{}voyager.online/tx/{}",
+            voyager_subdomain, transaction_hash
         ));
     }
 
