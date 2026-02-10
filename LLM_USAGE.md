@@ -155,7 +155,9 @@ Create a policy file `policy.json`:
 
 Register the session:
 ```bash
-controller register-session policy.json --json
+controller register-session policy.json \
+  --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
+  --json
 ```
 
 Expected output:
@@ -189,6 +191,7 @@ controller execute \
   --contract 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
   --entrypoint transfer \
   --calldata 0xRECIPIENT_ADDRESS,0xAMOUNT_LOW,0xAMOUNT_HIGH \
+  --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
   --json
 ```
 
@@ -209,7 +212,10 @@ Create `calls.json`:
 
 Execute:
 ```bash
-controller execute --file calls.json --json
+controller execute \
+  --file calls.json \
+  --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
+  --json
 ```
 
 Expected output:
@@ -226,6 +232,38 @@ When displaying transaction hashes to users, **always use Voyager** as the block
 - **Sepolia**: `https://sepolia.voyager.online/tx/0x...`
 
 **Never use** Starkscan or other explorers. Voyager is the preferred explorer for Cartridge Controller transactions.
+
+## Network Selection (Critical for LLMs)
+
+**Always be intentional about network selection.** Never rely on defaults.
+
+### When to Set Network
+
+1. **User explicitly mentions network**: "send on mainnet", "deploy to sepolia"
+   - Always add `--rpc-url` flag with the appropriate network
+
+2. **Network is ambiguous**: User says "send 10 STRK to 0xabc"
+   - First run `controller status --json` to check the current session's `chain_id`
+   - Use the same network as the current session, or ask the user which network
+
+3. **Registering a new session**: Always specify the network during registration
+   - This determines which network the session will work on
+
+### Network Detection Workflow
+
+```bash
+# Step 1: Check current session network
+controller status --json
+# Parse output: {"session": {"chain_id": "SN_SEPOLIA", ...}}
+
+# Step 2: Execute on the same network or switch explicitly
+controller execute \
+  --contract 0x... \
+  --entrypoint transfer \
+  --calldata 0x... \
+  --rpc-url https://api.cartridge.gg/x/starknet/sepolia \  # Match session network
+  --json
+```
 
 ### Specifying Network with --rpc-url
 
@@ -276,7 +314,11 @@ controller execute \
 Add `--wait` flag to wait for transaction confirmation:
 
 ```bash
-controller execute --file calls.json --wait --json
+controller execute \
+  --file calls.json \
+  --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
+  --wait \
+  --json
 ```
 
 This will poll until the transaction is confirmed (default 300 second timeout).
@@ -367,17 +409,24 @@ cat > policy.json << 'EOF'
 }
 EOF
 
-# 6. Register session (user must authorize in browser)
-controller register-session policy.json --json
+# 6. Register session on sepolia (user must authorize in browser)
+controller register-session policy.json \
+  --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
+  --json
 # Output: {"authorization_url": "https://...", "short_url": "https://api.cartridge.gg/s/abc123", ...}
 # User opens URL and authorizes
-# Output: {"message": "Session registered and stored successfully", ...}
+# Output: {"message": "Session registered and stored successfully", "chain_id": "SN_SEPOLIA", ...}
 
-# 7. Execute transaction
+# 7. Check status to see current network
+controller status --json
+# Output: {"status": "active", "session": {"chain_id": "SN_SEPOLIA", ...}, ...}
+
+# 8. Execute transaction on the same network
 controller execute \
   --contract 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
   --entrypoint transfer \
   --calldata 0xRECIPIENT,0x64,0x0 \
+  --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
   --json
 # Output: {"transaction_hash": "0x789...", ...}
 ```
@@ -389,12 +438,18 @@ controller execute \
 3. **Handle errors gracefully** by checking error_code and following recovery_hint
 4. **Display authorization URLs clearly** when registering sessions
 5. **Explain the human authorization step** - don't expect it to happen automatically
-6. **Check session status** before executing transactions
-7. **Use descriptive policy files** so users understand what they're authorizing
-8. **Validate addresses** before including in calldata (must be 32-byte hex with 0x prefix)
-9. **Handle BigInt amounts** correctly (split into low/high for u256)
-10. **Set appropriate timeouts** for `--wait` flag based on network conditions
-11. **Always use Voyager for transaction links** - Format as `https://voyager.online/tx/0x...` (mainnet) or `https://sepolia.voyager.online/tx/0x...` (sepolia). Never use Starkscan.
+6. **Always be intentional with network selection**:
+   - **Always set --rpc-url explicitly** for both `register-session` and `execute` commands
+   - When user mentions "mainnet", use `--rpc-url https://api.cartridge.gg/x/starknet/mainnet`
+   - When user mentions "sepolia" or "testnet", use `--rpc-url https://api.cartridge.gg/x/starknet/sepolia`
+   - If network is ambiguous, check `controller status --json` first to see the current `chain_id` in session info
+   - Never rely on config defaults - always be explicit about network intent
+7. **Check session status** before executing transactions to verify session exists and is not expired
+8. **Use descriptive policy files** so users understand what they're authorizing
+9. **Validate addresses** before including in calldata (must be 32-byte hex with 0x prefix)
+10. **Handle BigInt amounts** correctly (split into low/high for u256)
+11. **Set appropriate timeouts** for `--wait` flag based on network conditions
+12. **Always use Voyager for transaction links** - Format as `https://voyager.online/tx/0x...` (mainnet) or `https://sepolia.voyager.online/tx/0x...` (sepolia). Never use Starkscan.
 
 ## Transaction Amounts (u256 handling)
 
@@ -438,6 +493,7 @@ controller execute \
   --contract 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
   --entrypoint approve \
   --calldata 0xSPENDER_ADDRESS,0xAMOUNT,0x0 \
+  --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
   --json
 ```
 
@@ -462,7 +518,11 @@ Create `multicall.json`:
 
 Execute:
 ```bash
-controller execute --file multicall.json --wait --json
+controller execute \
+  --file multicall.json \
+  --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
+  --wait \
+  --json
 ```
 
 ## Security Notes
