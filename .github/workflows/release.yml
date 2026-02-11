@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'cli-v*'
+  pull_request:
+    types: [closed]
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       tag:
@@ -17,8 +21,40 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  create-tag:
+    name: Create Tag
+    if: |
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.merged == true &&
+       github.event.pull_request.head.ref == 'prepare-release')
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.extract.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version and create tag
+        id: extract
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          TAG="cli-v${VERSION}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Creating tag: ${TAG}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${TAG}"
+          git push origin "${TAG}"
+
   build:
     name: Build ${{ matrix.target }}
+    needs: [create-tag]
+    if: |
+      always() &&
+      (needs.create-tag.result == 'success' ||
+       needs.create-tag.result == 'skipped') &&
+      !(github.event_name == 'pull_request' &&
+        (github.event.pull_request.merged != true ||
+         github.event.pull_request.head.ref != 'prepare-release'))
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -42,6 +78,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create-tag.outputs.tag || github.ref }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -72,7 +110,8 @@ jobs:
 
   release:
     name: Create Release
-    needs: build
+    needs: [create-tag, build]
+    if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -87,6 +126,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "tag=${{ needs.create-tag.outputs.tag }}" >> $GITHUB_OUTPUT
           else
             echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
@@ -102,7 +143,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update install script
+      - name: Release summary
         run: |
           echo "✅ Release created: ${{ steps.tag.outputs.tag }}"
           echo ""
