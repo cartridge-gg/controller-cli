@@ -132,8 +132,61 @@ Active session (after `register-session`):
 ### 3. Register Session
 
 **Requirements:**
-- A policy JSON file defining allowed contracts and methods
+- Either a preset name OR a local policy JSON file
 - Human user to authorize via browser
+- RPC URL to determine which network
+
+#### Option A: Use a Preset (Recommended)
+
+For popular games and applications, use a preset from [cartridge-gg/presets](https://github.com/cartridge-gg/presets):
+
+**With --chain-id (simplest):**
+```bash
+controller register-session \
+  --preset loot-survivor \
+  --chain-id SN_MAIN \
+  --json
+```
+
+**With --rpc-url (explicit):**
+```bash
+controller register-session \
+  --preset loot-survivor \
+  --rpc-url https://api.cartridge.gg/x/starknet/mainnet \
+  --json
+```
+
+The CLI will:
+1. Fetch the preset configuration from GitHub
+2. Determine the chain (from --chain-id or by querying --rpc-url)
+3. Extract chain-specific policies (mainnet contracts vs sepolia contracts)
+4. Display a summary of contracts and entrypoints being authorized
+5. Validate the RPC endpoint
+6. Generate the authorization URL with chain identification
+
+**Expected output (human-readable):**
+```
+ℹ Fetching preset 'loot-survivor'...
+ℹ Determining chain from RPC URL...
+ℹ Using policies for chain: SN_MAIN
+ℹ Preset loaded: 6 contracts, 16 entrypoints
+ℹ Validating RPC endpoint...
+ℹ Authorization URL (SN_MAIN):
+
+https://api.cartridge.gg/s/abc123
+
+ℹ Waiting for authorization (timeout: 5 minutes)...
+```
+
+**Supported chain IDs:**
+- `SN_MAIN` - Starknet Mainnet (auto-maps to https://api.cartridge.gg/x/starknet/mainnet)
+- `SN_SEPOLIA` - Starknet Sepolia (auto-maps to https://api.cartridge.gg/x/starknet/sepolia)
+
+**For Cartridge SLOT or custom chains:** Use `--rpc-url` instead of `--chain-id` to specify your Katana endpoint
+
+**Available presets:** loot-survivor, influence, realms, pistols, dope-wars, and more. See https://github.com/cartridge-gg/presets/tree/main/configs
+
+#### Option B: Use a Local Policy File
 
 Create a policy file `policy.json`:
 ```json
@@ -155,12 +208,23 @@ Create a policy file `policy.json`:
 
 Register the session:
 ```bash
-controller register-session policy.json \
+controller register-session \
+  --file policy.json \
   --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
   --json
 ```
 
-Expected output:
+**Expected output (human-readable):**
+```
+ℹ Validating RPC endpoint...
+ℹ Authorization URL (SN_SEPOLIA):
+
+https://api.cartridge.gg/s/abc123
+
+ℹ Waiting for authorization (timeout: 5 minutes)...
+```
+
+**Expected output (JSON):**
 ```json
 {
   "authorization_url": "https://x.cartridge.gg/session?public_key=0x...&policies=...",
@@ -265,21 +329,37 @@ controller execute \
   --json
 ```
 
-### Specifying Network with --rpc-url
+### Specifying Network
 
-Both `register-session` and `execute` commands support the `--rpc-url` flag to specify which network to use. This flag **supersedes** the config.toml default RPC URL.
+Both `register-session` and `execute` commands support network selection via `--chain-id` (for presets) or `--rpc-url` (for explicit control).
 
-**Supported Networks:**
-- Mainnet: `https://api.cartridge.gg/x/starknet/mainnet`
-- Sepolia: `https://api.cartridge.gg/x/starknet/sepolia`
+**Option 1: Use --chain-id (simplest, for presets):**
+```bash
+controller register-session --preset loot-survivor --chain-id SN_MAIN
+```
 
-**Important:** Only Cartridge RPC endpoints are supported. Using non-Cartridge RPC URLs will result in an error.
+Supported chain IDs:
+- `SN_MAIN` - Auto-maps to `https://api.cartridge.gg/x/starknet/mainnet`
+- `SN_SEPOLIA` - Auto-maps to `https://api.cartridge.gg/x/starknet/sepolia`
+
+**Option 2: Use --rpc-url (explicit control):**
+```bash
+controller register-session --file policy.json \
+  --rpc-url https://api.cartridge.gg/x/starknet/mainnet
+```
+
+**Important:** Only Cartridge RPC endpoints are supported for mainnet/sepolia. For SLOT or custom chains, use `--rpc-url` with your Katana endpoint.
 
 **Examples:**
 
-Register session on mainnet:
+Register with chain-id (preset):
 ```bash
-controller register-session policy.json \
+controller register-session --preset loot-survivor --chain-id SN_MAIN --json
+```
+
+Register with rpc-url (file):
+```bash
+controller register-session --file policy.json \
   --rpc-url https://api.cartridge.gg/x/starknet/mainnet \
   --json
 ```
@@ -295,9 +375,10 @@ controller execute \
 ```
 
 **User Request Examples:**
+- "I want to play Loot Survivor on mainnet" → Use `--preset loot-survivor --chain-id SN_MAIN`
+- "Register for this game on sepolia" → Use `--preset <game> --chain-id SN_SEPOLIA`
 - "Send 10 STRK to 0xdeadbeef on mainnet" → Add `--rpc-url https://api.cartridge.gg/x/starknet/mainnet`
-- "Transfer tokens on sepolia" → Add `--rpc-url https://api.cartridge.gg/x/starknet/sepolia`
-- "Execute this on mainnet" → Add `--rpc-url https://api.cartridge.gg/x/starknet/mainnet`
+- "Execute this on sepolia" → Add `--rpc-url https://api.cartridge.gg/x/starknet/sepolia`
 
 **Priority Order:**
 1. `--rpc-url` flag (highest priority)
@@ -380,6 +461,36 @@ Common errors:
 
 **Recovery:** Retry `register-session` and ask user to authorize more quickly
 
+### UnsupportedChainId
+```json
+{
+  "error_code": "InvalidInput",
+  "message": "Unsupported chain ID 'SLOT'. Supported chains: SN_MAIN, SN_SEPOLIA. For Cartridge SLOT or other chains, use --rpc-url to specify your Katana endpoint."
+}
+```
+
+**Recovery:** Use `SN_MAIN` or `SN_SEPOLIA` for standard chains, or use `--rpc-url` with a custom RPC endpoint for SLOT/Katana
+
+### PresetNotFound
+```json
+{
+  "error_code": "InvalidInput",
+  "message": "Preset 'invalid-game' not found. Check available presets at: https://github.com/cartridge-gg/presets/tree/main/configs"
+}
+```
+
+**Recovery:** Check available presets at https://github.com/cartridge-gg/presets/tree/main/configs or use `--file` with a local policy file
+
+### PresetChainNotSupported
+```json
+{
+  "error_code": "InvalidInput",
+  "message": "Preset 'loot-survivor' does not support chain 'SN_SEPOLIA'. Available chains: SN_MAIN"
+}
+```
+
+**Recovery:** Use a supported chain for the preset, or create a custom policy file with `--file`
+
 ## Complete Example Flow
 
 ```bash
@@ -409,13 +520,14 @@ cat > policy.json << 'EOF'
 }
 EOF
 
-# 6. Register session on sepolia (user must authorize in browser)
-controller register-session policy.json \
-  --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
+# 6. Register session using preset (user must authorize in browser)
+controller register-session \
+  --preset loot-survivor \
+  --chain-id SN_MAIN \
   --json
 # Output: {"authorization_url": "https://...", "short_url": "https://api.cartridge.gg/s/abc123", ...}
 # User opens URL and authorizes
-# Output: {"message": "Session registered and stored successfully", "chain_id": "SN_SEPOLIA", ...}
+# Output: {"message": "Session registered and stored successfully", "chain_id": "SN_MAIN", ...}
 
 # 7. Check status to see current network
 controller status --json
@@ -439,13 +551,19 @@ controller execute \
 4. **Display authorization URLs clearly** when registering sessions
 5. **Explain the human authorization step** - don't expect it to happen automatically
 6. **Always be intentional with network selection**:
-   - **Always set --rpc-url explicitly** for both `register-session` and `execute` commands
-   - When user mentions "mainnet", use `--rpc-url https://api.cartridge.gg/x/starknet/mainnet`
-   - When user mentions "sepolia" or "testnet", use `--rpc-url https://api.cartridge.gg/x/starknet/sepolia`
-   - If network is ambiguous, check `controller status --json` first to see the current `chain_id` in session info
+   - For presets, use `--chain-id SN_MAIN` or `--chain-id SN_SEPOLIA` (simplest)
+   - For custom configs, use `--rpc-url https://api.cartridge.gg/x/starknet/mainnet` or sepolia
+   - When user mentions "mainnet", use `--chain-id SN_MAIN` (presets) or `--rpc-url` (files)
+   - When user mentions "sepolia" or "testnet", use `--chain-id SN_SEPOLIA` (presets) or `--rpc-url` (files)
+   - If network is ambiguous, check `controller status --json` first to see the current `chain_id`
    - Never rely on config defaults - always be explicit about network intent
 7. **Check session status** before executing transactions to verify session exists and is not expired
-8. **Use descriptive policy files** so users understand what they're authorizing
+8. **Prefer presets for known games/apps**:
+   - Use `--preset loot-survivor --chain-id SN_MAIN` for simplicity
+   - Presets are maintained by project teams and always up-to-date
+   - See available presets at https://github.com/cartridge-gg/presets/tree/main/configs
+   - Only use `--file` for custom contracts or testing
+   - For SLOT or custom chains, use `--preset <name> --rpc-url <katana-endpoint>`
 9. **Validate addresses** before including in calldata (must be 32-byte hex with 0x prefix)
 10. **Handle BigInt amounts** correctly (split into low/high for u256)
 11. **Set appropriate timeouts** for `--wait` flag based on network conditions

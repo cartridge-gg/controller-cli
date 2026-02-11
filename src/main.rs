@@ -3,6 +3,7 @@ mod commands;
 mod config;
 mod error;
 mod output;
+mod presets;
 
 use clap::{Parser, Subcommand};
 use config::Config;
@@ -32,11 +33,20 @@ enum Commands {
 
     /// Generate authorization URL for session registration
     RegisterSession {
-        /// Path to policy file (JSON)
-        policy_file: String,
+        /// Preset name (e.g., 'loot-survivor')
+        #[arg(long, conflicts_with = "file")]
+        preset: Option<String>,
+
+        /// Path to local policy file (JSON)
+        #[arg(long, conflicts_with = "preset")]
+        file: Option<String>,
+
+        /// Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA') - auto-selects RPC URL
+        #[arg(long, conflicts_with = "rpc_url")]
+        chain_id: Option<String>,
 
         /// RPC URL to use (overrides config)
-        #[arg(long)]
+        #[arg(long, conflicts_with = "chain_id")]
         rpc_url: Option<String>,
     },
 
@@ -113,9 +123,11 @@ async fn main() {
     let result = match cli.command {
         Commands::GenerateKeypair => commands::generate::execute(&config, &*formatter).await,
         Commands::RegisterSession {
-            policy_file,
+            preset,
+            file,
+            chain_id,
             rpc_url,
-        } => commands::register::execute(&config, &*formatter, policy_file, rpc_url).await,
+        } => commands::register::execute(&config, &*formatter, preset, file, chain_id, rpc_url).await,
         Commands::StoreSession {
             session_data,
             from_file,

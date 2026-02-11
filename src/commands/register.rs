@@ -3,6 +3,7 @@ use crate::{
     config::Config,
     error::{CliError, Result},
     output::OutputFormatter,
+    presets,
 };
 use account_sdk::storage::{
     filestorage::FileSystemBackend, Credentials, StorageBackend, StorageValue,
@@ -59,9 +60,35 @@ pub struct RegisterOutput {
 pub async fn execute(
     config: &Config,
     formatter: &dyn OutputFormatter,
-    policy_file: String,
+    preset: Option<String>,
+    file: Option<String>,
+    chain_id: Option<String>,
     rpc_url: Option<String>,
 ) -> Result<()> {
+    // Validate that either preset or file is provided
+    if preset.is_none() && file.is_none() {
+        return Err(CliError::InvalidInput(
+            "Either --preset or --file must be provided".to_string(),
+        ));
+    }
+
+    // Map chain_id to RPC URL if provided
+    let resolved_rpc_url = if let Some(ref chain_id_str) = chain_id {
+        match chain_id_str.as_str() {
+            "SN_MAIN" => Some("https://api.cartridge.gg/x/starknet/mainnet".to_string()),
+            "SN_SEPOLIA" => Some("https://api.cartridge.gg/x/starknet/sepolia".to_string()),
+            _ => {
+                return Err(CliError::InvalidInput(format!(
+                    "Unsupported chain ID '{}'. Supported chains: SN_MAIN, SN_SEPOLIA. \
+                     For Cartridge SLOT or other chains, use --rpc-url to specify your Katana endpoint.",
+                    chain_id_str
+                )));
+            }
+        }
+    } else {
+        rpc_url
+    };
+
     // Load the stored keypair
     let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
     let mut backend = FileSystemBackend::new(storage_path);
@@ -81,12 +108,90 @@ pub async fn execute(
         }
     };
 
-    // Load policies from file
-    let policy_content = std::fs::read_to_string(&policy_file)
-        .map_err(|e| CliError::InvalidInput(format!("Failed to read policy file: {}", e)))?;
+    // Load policies from preset or file
+    let policy_file: PolicyFile = if let Some(preset_name) = preset {
+        // Fetch preset from GitHub
+        formatter.info(&format!("Fetching preset '{}'...", preset_name));
+        let preset_config = presets::fetch_preset(&preset_name).await?;
 
-    let policy_file: PolicyFile = serde_json::from_str(&policy_content)
-        .map_err(|e| CliError::InvalidInput(format!("Invalid policy file format: {}", e)))?;
+        // If resolved_rpc_url is provided, extract chain-specific policies
+        if let Some(ref rpc_url_str) = resolved_rpc_url {
+            formatter.info("Determining chain from RPC URL...");
+            let provider = starknet::providers::jsonrpc::JsonRpcClient::new(
+                starknet::providers::jsonrpc::HttpTransport::new(
+                    url::Url::parse(rpc_url_str)
+                        .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {}", e)))?,
+                ),
+            );
+
+            let chain_id = starknet::providers::Provider::chain_id(&provider)
+                .await
+                .map_err(|e| {
+                    CliError::InvalidInput(format!("Failed to query chain_id from RPC: {}", e))
+                })?;
+
+            let chain_name = starknet::core::utils::parse_cairo_short_string(&chain_id)
+                .unwrap_or_else(|_| format!("0x{:x}", chain_id));
+
+            formatter.info(&format!("Using policies for chain: {}", chain_name));
+
+            // Extract chain-specific policies
+            let chain_policies =
+                presets::extract_chain_policies(&preset_config, &chain_name, &preset_name)?;
+
+            // Convert to PolicyFile format
+            let contracts: std::collections::HashMap<String, ContractPolicy> = chain_policies
+                .contracts
+                .into_iter()
+                .map(|(addr, contract)| {
+                    (
+                        addr,
+                        ContractPolicy {
+                            name: Some(contract.name),
+                            methods: contract
+                                .methods
+                                .into_iter()
+                                .map(|m| MethodPolicy {
+                                    name: m.name,
+                                    entrypoint: m.entrypoint,
+                                    description: m.description,
+                                    amount: None,
+                                    authorized: true,
+                                })
+                                .collect(),
+                        },
+                    )
+                })
+                .collect();
+
+            // Display summary of what will be authorized
+            let total_entrypoints: usize = contracts.values().map(|c| c.methods.len()).sum();
+            formatter.info(&format!(
+                "Preset loaded: {} contracts, {} entrypoints",
+                contracts.len(),
+                total_entrypoints
+            ));
+
+            PolicyFile {
+                contracts,
+                messages: chain_policies.messages,
+            }
+        } else {
+            return Err(CliError::InvalidInput(
+                "--chain-id or --rpc-url is required when using --preset to determine which chain policies to use"
+                    .to_string(),
+            ));
+        }
+    } else if let Some(file_path) = file {
+        // Load from local file
+        let policy_content = std::fs::read_to_string(&file_path)
+            .map_err(|e| CliError::InvalidInput(format!("Failed to read policy file: {}", e)))?;
+
+        serde_json::from_str(&policy_content)
+            .map_err(|e| CliError::InvalidInput(format!("Invalid policy file format: {}", e)))?
+    } else {
+        unreachable!("Either preset or file must be provided");
+    };
 
     // Convert to the format expected by the keychain
     let mut policies = serde_json::json!({
@@ -177,10 +282,10 @@ pub async fn execute(
     }
 
     // Use CLI flag if provided, otherwise use config
-    let effective_rpc_url = rpc_url.as_ref().unwrap_or(&config.session.default_rpc_url);
+    let effective_rpc_url = resolved_rpc_url.as_ref().unwrap_or(&config.session.default_rpc_url);
 
-    // If --rpc-url was provided, validate it's a Cartridge RPC endpoint
-    if let Some(ref url) = rpc_url {
+    // If --rpc-url or --chain-id was provided, validate it's a Cartridge RPC endpoint
+    if let Some(ref url) = resolved_rpc_url {
         if !url.starts_with("https://api.cartridge.gg") {
             return Err(CliError::InvalidInput(
                 "Only Cartridge RPC endpoints are supported. Use: https://api.cartridge.gg/x/starknet/mainnet or https://api.cartridge.gg/x/starknet/sepolia".to_string()
@@ -188,28 +293,35 @@ pub async fn execute(
         }
     }
 
-    // If --rpc-url was provided, validate it works by querying chain_id
-    if rpc_url.is_some() {
-        formatter.info("Validating RPC endpoint...");
-        let provider = starknet::providers::jsonrpc::JsonRpcClient::new(
-            starknet::providers::jsonrpc::HttpTransport::new(
-                url::Url::parse(effective_rpc_url)
-                    .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {}", e)))?,
-            ),
-        );
+    // Query chain_id from the RPC endpoint to display in authorization URL
+    formatter.info("Validating RPC endpoint...");
+    let provider = starknet::providers::jsonrpc::JsonRpcClient::new(
+        starknet::providers::jsonrpc::HttpTransport::new(
+            url::Url::parse(effective_rpc_url)
+                .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {}", e)))?,
+        ),
+    );
 
-        match starknet::providers::Provider::chain_id(&provider).await {
-            Ok(_chain_id) => {
-                // Validation successful, continue
-            }
-            Err(e) => {
+    let detected_chain_name = match starknet::providers::Provider::chain_id(&provider).await {
+        Ok(chain_id_felt) => {
+            // Parse chain name for display
+            let chain_name = starknet::core::utils::parse_cairo_short_string(&chain_id_felt)
+                .unwrap_or_else(|_| format!("0x{:x}", chain_id_felt));
+            Some(chain_name)
+        }
+        Err(e) => {
+            // Only error out if --rpc-url or --chain-id was explicitly provided
+            if resolved_rpc_url.is_some() {
                 return Err(CliError::InvalidInput(format!(
                     "RPC endpoint not responding: {}",
                     e
                 )));
             }
+            // If using default RPC from config, just log warning and continue
+            formatter.info(&format!("Warning: Could not query chain from RPC: {}", e));
+            None
         }
-    }
+    };
 
     // Build the authorization URL
     let mut url = Url::parse(&format!("{}/session", config.session.keychain_url))
@@ -244,8 +356,11 @@ pub async fn execute(
     if config.cli.json_output {
         formatter.success(&output);
     } else {
-        formatter.info(&format!("Chain: {}", config.session.default_chain_id));
-        formatter.info("Authorization URL:");
+        if let Some(chain_name) = detected_chain_name {
+            formatter.info(&format!("Authorization URL ({}):", chain_name));
+        } else {
+            formatter.info("Authorization URL:");
+        }
         println!("\n{}\n", display_url);
         formatter.info("Waiting for authorization (timeout: 5 minutes)...");
     }
