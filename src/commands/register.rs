@@ -282,7 +282,9 @@ pub async fn execute(
     }
 
     // Use CLI flag if provided, otherwise use config
-    let effective_rpc_url = resolved_rpc_url.as_ref().unwrap_or(&config.session.default_rpc_url);
+    let effective_rpc_url = resolved_rpc_url
+        .as_ref()
+        .unwrap_or(&config.session.default_rpc_url);
 
     // If --rpc-url or --chain-id was provided, validate it's a Cartridge RPC endpoint
     if let Some(ref url) = resolved_rpc_url {

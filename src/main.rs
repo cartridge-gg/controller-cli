@@ -127,7 +127,9 @@ async fn main() {
             file,
             chain_id,
             rpc_url,
-        } => commands::register::execute(&config, &*formatter, preset, file, chain_id, rpc_url).await,
+        } => {
+            commands::register::execute(&config, &*formatter, preset, file, chain_id, rpc_url).await
+        }
         Commands::StoreSession {
             session_data,
             from_file,
