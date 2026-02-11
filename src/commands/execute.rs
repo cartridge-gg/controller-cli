@@ -1,4 +1,5 @@
 use crate::{
+    commands::register::PolicyStorage,
     config::Config,
     error::{CliError, Result},
     output::OutputFormatter,
@@ -124,6 +125,16 @@ pub async fn execute(
         })
         .unwrap_or_else(|| config.session.default_rpc_url.clone());
 
+    // Load stored policies for pre-execution validation
+    let stored_policies: Option<PolicyStorage> = backend
+        .get("session_policies")
+        .ok()
+        .flatten()
+        .and_then(|v| match v {
+            StorageValue::String(json) => serde_json::from_str(&json).ok(),
+            _ => None,
+        });
+
     // If --rpc-url was provided, validate it's a Cartridge RPC endpoint
     if let Some(ref url) = rpc_url {
         if !url.starts_with("https://api.cartridge.gg") {
@@ -210,6 +221,11 @@ pub async fn execute(
         })
         .collect::<Result<Vec<_>>>()?;
 
+    // Validate calls against registered session policies
+    if let Some(ref policies) = stored_policies {
+        validate_calls_against_policies(&calls, policies)?;
+    }
+
     let chain_name = match controller.provider.chain_id().await {
         Ok(felt) => starknet::core::utils::parse_cairo_short_string(&felt)
             .unwrap_or_else(|_| format!("0x{:x}", felt)),
@@ -246,7 +262,7 @@ pub async fn execute(
             Ok(result) => result,
             Err(e) => {
                 return Err(CliError::TransactionFailed(format!(
-                    "Paymaster execution failed: {}. Use --no-paymaster to force self-pay",
+                    "Paymaster execution failed: {}\nUse --no-paymaster to force self-pay",
                     e
                 )));
             }
@@ -308,4 +324,208 @@ pub async fn execute(
     }
 
     Ok(())
+}
+
+/// Validates that all calls are permitted by the stored session policies.
+/// Checks both contract address (normalized to handle leading zeros) and entrypoint.
+fn validate_calls_against_policies(calls: &[CallSpec], policies: &PolicyStorage) -> Result<()> {
+    if calls.is_empty() {
+        return Err(CliError::InvalidInput(
+            "No calls provided to execute.".to_string(),
+        ));
+    }
+
+    for call in calls {
+        // Normalize by parsing as Felt to handle leading zeros (0x06f... == 0x6f...)
+        let call_felt = Felt::from_hex(&call.contract_address).ok();
+        let matching_contract = policies.contracts.iter().find(|(addr, _)| {
+            match (call_felt, Felt::from_hex(addr).ok()) {
+                (Some(a), Some(b)) => a == b,
+                _ => addr.to_lowercase() == call.contract_address.to_lowercase(),
+            }
+        });
+
+        match matching_contract {
+            None => {
+                return Err(CliError::InvalidInput(format!(
+                    "Contract {} is not authorized by the current session policies. \
+                     Register a new session with policies that include this contract.",
+                    call.contract_address
+                )));
+            }
+            Some((_, contract_policy)) => {
+                let entrypoint_allowed = contract_policy
+                    .methods
+                    .iter()
+                    .any(|m| m.entrypoint == call.entrypoint);
+
+                if !entrypoint_allowed {
+                    let allowed: Vec<&str> = contract_policy
+                        .methods
+                        .iter()
+                        .map(|m| m.entrypoint.as_str())
+                        .collect();
+                    return Err(CliError::InvalidInput(format!(
+                        "Entrypoint '{}' on contract {} is not authorized by the current session. \
+                         Allowed entrypoints: [{}]",
+                        call.entrypoint,
+                        call.contract_address,
+                        allowed.join(", ")
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::commands::register::{ContractPolicy, MethodPolicy, PolicyStorage};
+    use std::collections::HashMap;
+
+    fn make_policies(contracts: Vec<(&str, Vec<&str>)>) -> PolicyStorage {
+        let mut map = HashMap::new();
+        for (addr, methods) in contracts {
+            map.insert(
+                addr.to_string(),
+                ContractPolicy {
+                    name: None,
+                    methods: methods
+                        .into_iter()
+                        .map(|e| MethodPolicy {
+                            name: e.to_string(),
+                            entrypoint: e.to_string(),
+                            description: None,
+                            amount: None,
+                            authorized: true,
+                        })
+                        .collect(),
+                },
+            );
+        }
+        PolicyStorage { contracts: map }
+    }
+
+    fn make_call(contract: &str, entrypoint: &str) -> CallSpec {
+        CallSpec {
+            contract_address: contract.to_string(),
+            entrypoint: entrypoint.to_string(),
+            calldata: vec![],
+        }
+    }
+
+    #[test]
+    fn test_allowed_call_passes() {
+        let policies = make_policies(vec![(
+            "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+            vec!["transfer", "approve"],
+        )]);
+        let calls = vec![make_call(
+            "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+            "transfer",
+        )];
+        assert!(validate_calls_against_policies(&calls, &policies).is_ok());
+    }
+
+    #[test]
+    fn test_unauthorized_contract_rejected() {
+        let policies = make_policies(vec![(
+            "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+            vec!["transfer"],
+        )]);
+        let calls = vec![make_call("0xdeadbeef", "transfer")];
+        let err = validate_calls_against_policies(&calls, &policies).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("not authorized"), "got: {}", msg);
+        assert!(msg.contains("0xdeadbeef"));
+    }
+
+    #[test]
+    fn test_unauthorized_entrypoint_rejected() {
+        let policies = make_policies(vec![(
+            "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+            vec!["transfer"],
+        )]);
+        let calls = vec![make_call(
+            "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+            "mint",
+        )];
+        let err = validate_calls_against_policies(&calls, &policies).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("'mint'"), "got: {}", msg);
+        assert!(
+            msg.contains("Allowed entrypoints: [transfer]"),
+            "got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_leading_zero_normalization() {
+        // Policy has leading zero, call does not
+        let policies = make_policies(vec![(
+            "0x06f7c4350d6d5ee926b3ac4fa0c9c351055456e75c92227468d84232fc493a9c",
+            vec!["start_game"],
+        )]);
+        let calls = vec![make_call(
+            "0x6f7c4350d6d5ee926b3ac4fa0c9c351055456e75c92227468d84232fc493a9c",
+            "start_game",
+        )];
+        assert!(validate_calls_against_policies(&calls, &policies).is_ok());
+    }
+
+    #[test]
+    fn test_leading_zero_normalization_reversed() {
+        // Policy has no leading zero, call has leading zero
+        let policies = make_policies(vec![(
+            "0x6f7c4350d6d5ee926b3ac4fa0c9c351055456e75c92227468d84232fc493a9c",
+            vec!["start_game"],
+        )]);
+        let calls = vec![make_call(
+            "0x06f7c4350d6d5ee926b3ac4fa0c9c351055456e75c92227468d84232fc493a9c",
+            "start_game",
+        )];
+        assert!(validate_calls_against_policies(&calls, &policies).is_ok());
+    }
+
+    #[test]
+    fn test_case_insensitive_address_fallback() {
+        let policies = make_policies(vec![("0xABCDEF1234567890", vec!["transfer"])]);
+        let calls = vec![make_call("0xabcdef1234567890", "transfer")];
+        assert!(validate_calls_against_policies(&calls, &policies).is_ok());
+    }
+
+    #[test]
+    fn test_multiple_contracts_multiple_calls() {
+        let policies = make_policies(vec![
+            ("0xaaa", vec!["transfer", "approve"]),
+            ("0xbbb", vec!["swap"]),
+        ]);
+        let calls = vec![make_call("0xaaa", "approve"), make_call("0xbbb", "swap")];
+        assert!(validate_calls_against_policies(&calls, &policies).is_ok());
+    }
+
+    #[test]
+    fn test_second_call_fails_validation() {
+        let policies = make_policies(vec![("0xaaa", vec!["transfer"]), ("0xbbb", vec!["swap"])]);
+        let calls = vec![
+            make_call("0xaaa", "transfer"),
+            make_call("0xbbb", "mint"), // not allowed
+        ];
+        let err = validate_calls_against_policies(&calls, &policies).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("'mint'"), "got: {}", msg);
+        assert!(msg.contains("0xbbb"), "got: {}", msg);
+    }
+
+    #[test]
+    fn test_empty_calls_rejected() {
+        let policies = make_policies(vec![("0xaaa", vec!["transfer"])]);
+        let calls: Vec<CallSpec> = vec![];
+        let err = validate_calls_against_policies(&calls, &policies).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("No calls"), "got: {}", msg);
+    }
 }
