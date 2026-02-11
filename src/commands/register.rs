@@ -200,14 +200,21 @@ pub async fn execute(
     });
 
     // Also build Policy structures for storage
+    // IMPORTANT: Sort contracts by address and methods by entrypoint name to match
+    // the frontend's toWasmPolicies() canonical ordering. Without this, the Merkle
+    // tree root will differ from what was registered on-chain, causing session/not-registered.
     let mut policy_vec = Vec::new();
 
     if let Some(contracts) = policies.as_object_mut() {
         if let Some(contracts_obj) = contracts.get_mut("contracts") {
             if let Some(contracts_map) = contracts_obj.as_object_mut() {
-                for (address, contract) in &policy_file.contracts {
+                // Sort contracts by address (case-insensitive) to match toWasmPolicies
+                let mut sorted_contracts: Vec<_> = policy_file.contracts.iter().collect();
+                sorted_contracts.sort_by(|(a, _), (b, _)| a.to_lowercase().cmp(&b.to_lowercase()));
+
+                for (address, contract) in &sorted_contracts {
                     contracts_map.insert(
-                        address.clone(),
+                        address.to_string(),
                         serde_json::json!({
                             "methods": &contract.methods
                         }),
@@ -222,7 +229,11 @@ pub async fn execute(
                             ))
                         })?;
 
-                    for method in &contract.methods {
+                    // Sort methods by entrypoint name to match toWasmPolicies
+                    let mut sorted_methods = contract.methods.clone();
+                    sorted_methods.sort_by(|a, b| a.entrypoint.cmp(&b.entrypoint));
+
+                    for method in &sorted_methods {
                         // Compute selector from entrypoint name
                         let selector =
                             starknet::core::utils::get_selector_from_name(&method.entrypoint)
