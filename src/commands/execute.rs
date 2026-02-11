@@ -45,6 +45,7 @@ pub async fn execute(
     wait: bool,
     timeout: u64,
     rpc_url: Option<String>,
+    no_paymaster: bool,
 ) -> Result<()> {
     // Parse calls from arguments or file
     let calls = if let Some(file_path) = file {
@@ -222,10 +223,37 @@ pub async fn execute(
 
     formatter.info(&format!("Executing transaction on {}...", chain_name));
 
-    let result = controller
-        .try_session_execute(starknet_calls, None)
-        .await
-        .map_err(|e| CliError::TransactionFailed(format!("Transaction failed: {}", e)))?;
+    // Execute based on paymaster preference
+    let result = if no_paymaster {
+        // Force self-pay: estimate fee and execute directly
+        formatter.info(&format!(
+            "Executing transaction on {} without paymaster...",
+            chain_name
+        ));
+        let estimate = controller
+            .estimate_invoke_fee(starknet_calls.clone())
+            .await
+            .map_err(|e| CliError::TransactionFailed(format!("Fee estimation failed: {}", e)))?;
+        controller
+            .execute(starknet_calls, Some(estimate), None)
+            .await
+            .map_err(|e| CliError::TransactionFailed(format!("Transaction failed: {}", e)))?
+    } else {
+        // Try paymaster first, fail if unavailable (no fallback)
+        formatter.info(&format!("Executing transaction on {}...", chain_name));
+        match controller
+            .execute_from_outside_v3(starknet_calls, None)
+            .await
+        {
+            Ok(result) => result,
+            Err(e) => {
+                return Err(CliError::TransactionFailed(format!(
+                    "Paymaster execution failed: {}. Use --no-paymaster to force self-pay",
+                    e
+                )));
+            }
+        }
+    };
 
     let transaction_hash = format!("0x{:x}", result.transaction_hash);
 
