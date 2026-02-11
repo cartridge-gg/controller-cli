@@ -4,6 +4,7 @@ mod config;
 mod error;
 mod output;
 mod presets;
+mod version;
 
 use clap::{Parser, Subcommand};
 use config::Config;
@@ -124,6 +125,9 @@ async fn main() {
 
     let formatter = create_formatter(config.cli.json_output, config.cli.use_colors);
 
+    // Start version check in background (non-blocking)
+    let update_check = tokio::spawn(version::check_for_update());
+
     let result = match cli.command {
         Commands::GenerateKeypair => commands::generate::execute(&config, &*formatter).await,
         Commands::RegisterSession {
@@ -168,6 +172,15 @@ async fn main() {
 
     if let Err(e) = result {
         formatter.error(&e);
+        // Still show update warning on error
+        if let Ok(Some(msg)) = update_check.await {
+            formatter.warning(&msg);
+        }
         std::process::exit(1);
+    }
+
+    // Show update warning after successful command output
+    if let Ok(Some(msg)) = update_check.await {
+        formatter.warning(&msg);
     }
 }
