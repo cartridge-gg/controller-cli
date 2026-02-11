@@ -64,6 +64,25 @@ pub struct ControllerInfo {
     pub account_id: String,
 }
 
+/// Session information for listing sessions
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SessionListInfo {
+    pub id: String,
+    #[serde(rename = "appID")]
+    pub app_id: Option<String>,
+    #[serde(rename = "chainID")]
+    pub chain_id: String,
+    #[serde(rename = "isRevoked")]
+    pub is_revoked: bool,
+    #[serde(rename = "expiresAt")]
+    pub expires_at: u64,
+    #[serde(rename = "createdAt")]
+    pub created_at: Option<String>,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: Option<String>,
+    pub controller: ControllerInfo,
+}
+
 /// Query session creation from the Cartridge API (long-polling)
 ///
 /// This uses the `subscribeCreateSession` query which implements long-polling:
@@ -206,4 +225,99 @@ impl SessionInfo {
             self.chain_id
         )))
     }
+}
+
+/// Query all sessions for a controller address from the Cartridge API
+pub async fn query_controller_sessions(
+    api_url: &str,
+    controller_address: &str,
+) -> Result<Vec<SessionListInfo>> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| CliError::ApiError(format!("Failed to build HTTP client: {}", e)))?;
+
+    let query = r#"
+        query ListSessions($address: Felt!) {
+            sessions(filter: { controllerAddress: $address }) {
+                id
+                appID
+                chainID
+                isRevoked
+                expiresAt
+                createdAt
+                updatedAt
+                controller {
+                    address
+                    accountID
+                }
+            }
+        }
+    "#;
+
+    #[derive(Serialize)]
+    struct Variables {
+        address: String,
+    }
+
+    #[derive(Serialize)]
+    struct GraphQLRequest {
+        query: String,
+        variables: Variables,
+    }
+
+    #[derive(Deserialize)]
+    struct GraphQLResponse {
+        data: Option<GraphQLData>,
+        errors: Option<Vec<GraphQLError>>,
+    }
+
+    #[derive(Deserialize)]
+    struct GraphQLData {
+        sessions: Vec<SessionListInfo>,
+    }
+
+    #[derive(Deserialize)]
+    struct GraphQLError {
+        message: String,
+    }
+
+    let request = GraphQLRequest {
+        query: query.to_string(),
+        variables: Variables {
+            address: controller_address.to_string(),
+        },
+    };
+
+    let response = client
+        .post(api_url)
+        .json(&request)
+        .send()
+        .await
+        .map_err(|e| CliError::ApiError(format!("Failed to query sessions: {}", e)))?;
+
+    if !response.status().is_success() {
+        return Err(CliError::ApiError(format!(
+            "API returned error status: {}",
+            response.status()
+        )));
+    }
+
+    let graphql_response: GraphQLResponse = response
+        .json()
+        .await
+        .map_err(|e| CliError::ApiError(format!("Failed to parse API response: {}", e)))?;
+
+    if let Some(errors) = graphql_response.errors {
+        let error_messages: Vec<String> = errors.iter().map(|e| e.message.clone()).collect();
+        return Err(CliError::ApiError(format!(
+            "GraphQL errors: {}",
+            error_messages.join(", ")
+        )));
+    }
+
+    Ok(graphql_response
+        .data
+        .map(|data| data.sessions)
+        .unwrap_or_default())
 }

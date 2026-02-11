@@ -116,6 +116,9 @@ enum Commands {
         #[arg(long)]
         addresses: Option<String>,
     },
+
+    /// List all active sessions for the authenticated controller
+    ListSessions,
 }
 
 #[tokio::main]
@@ -183,6 +186,7 @@ async fn main() {
             usernames,
             addresses,
         } => commands::lookup::execute(&config, &*formatter, usernames, addresses).await,
+        Commands::ListSessions => commands::list_sessions::execute(&config, &*formatter).await,
     };
 
     if let Err(e) = result {
