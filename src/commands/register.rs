@@ -9,7 +9,7 @@ use account_sdk::storage::{
     filestorage::FileSystemBackend, Credentials, StorageBackend, StorageValue,
 };
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
 use url::Url;
 
 #[derive(Serialize, Deserialize)]
@@ -55,6 +55,31 @@ pub struct RegisterOutput {
     pub short_url: Option<String>,
     pub public_key: String,
     pub message: String,
+}
+
+fn try_open_authorization_url(formatter: &dyn OutputFormatter, url: &str) {
+    let _ = try_open_authorization_url_with(formatter, url, webbrowser::open);
+}
+
+fn try_open_authorization_url_with<F, E>(
+    formatter: &dyn OutputFormatter,
+    url: &str,
+    opener: F,
+) -> bool
+where
+    F: FnOnce(&str) -> std::result::Result<(), E>,
+    E: Display,
+{
+    match opener(url) {
+        Ok(()) => true,
+        Err(e) => {
+            formatter.warning(&format!(
+                "Could not open browser automatically: {}. Please open the URL manually.",
+                e
+            ));
+            false
+        }
+    }
 }
 
 pub async fn execute(
@@ -356,6 +381,7 @@ pub async fn execute(
 
     // Show URL and start polling
     let display_url = short_url.as_deref().unwrap_or(&authorization_url);
+    try_open_authorization_url(formatter, display_url);
 
     let output = RegisterOutput {
         authorization_url: authorization_url.clone(),
@@ -546,4 +572,63 @@ fn store_session_from_api(
         .map_err(|e| CliError::Storage(e.to_string()))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::CliError;
+    use std::cell::{Cell, RefCell};
+
+    #[derive(Default)]
+    struct TestFormatter {
+        warnings: RefCell<Vec<String>>,
+    }
+
+    impl OutputFormatter for TestFormatter {
+        fn success(&self, _data: &dyn erased_serde::Serialize) {}
+
+        fn error(&self, _error: &CliError) {}
+
+        fn info(&self, _message: &str) {}
+
+        fn warning(&self, message: &str) {
+            self.warnings.borrow_mut().push(message.to_string());
+        }
+    }
+
+    #[test]
+    fn opens_authorization_url_when_opener_succeeds() {
+        let formatter = TestFormatter::default();
+        let called = Cell::new(false);
+        let target_url = "https://example.com/session";
+
+        let opened = try_open_authorization_url_with(
+            &formatter,
+            target_url,
+            |url| -> std::result::Result<(), &str> {
+                called.set(url == target_url);
+                Ok(())
+            },
+        );
+
+        assert!(opened);
+        assert!(called.get());
+        assert!(formatter.warnings.borrow().is_empty());
+    }
+
+    #[test]
+    fn warns_when_browser_open_fails() {
+        let formatter = TestFormatter::default();
+        let opened = try_open_authorization_url_with(
+            &formatter,
+            "https://example.com/session",
+            |_url| -> std::result::Result<(), &str> { Err("mock failure") },
+        );
+
+        assert!(!opened);
+        let warnings = formatter.warnings.borrow();
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("Could not open browser automatically: mock failure"));
+    }
 }

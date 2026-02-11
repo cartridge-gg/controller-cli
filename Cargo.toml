@@ -45,6 +45,7 @@ thiserror = "1"
 base64 = "0.22"
 hex = "0.4"
 url = "2.3"
+webbrowser = "1.0"
 
 # Terminal output
 colored = "2.1"
