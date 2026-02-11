@@ -221,8 +221,6 @@ pub async fn execute(
     };
     let is_mainnet = chain_name == "SN_MAIN";
 
-    formatter.info(&format!("Executing transaction on {}...", chain_name));
-
     // Execute based on paymaster preference
     let result = if no_paymaster {
         // Force self-pay: estimate fee and execute directly
