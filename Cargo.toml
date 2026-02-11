@@ -1,6 +1,6 @@
 [package]
 name = "controller-cli"
-version = "0.1.11"
+version = "0.1.12"
 edition = "2021"
 authors = ["Cartridge <engineering@cartridge.gg>"]
 description = "CLI for Cartridge Controller session management"
