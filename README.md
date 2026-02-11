@@ -87,7 +87,19 @@ controller status
 
 Returns `no_session`, `keypair_only`, or `active` with expiration details.
 
-### 5. Clear Session
+### 5. Look Up Usernames / Addresses
+
+```bash
+# Resolve usernames to addresses
+controller lookup --usernames shinobi,sensei
+
+# Resolve addresses to usernames
+controller lookup --addresses 0x123...,0x456...
+```
+
+Returns `username:address` pairs. See the [Cartridge Usernames docs](https://docs.cartridge.gg/controller/usernames) for API details.
+
+### 6. Clear Session
 
 ```bash
 controller clear

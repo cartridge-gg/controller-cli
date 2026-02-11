@@ -192,6 +192,45 @@ controller execute --file calls.json --json
 
 ---
 
+### controller_lookup
+
+Look up Cartridge controller addresses by usernames or usernames by addresses.
+
+**When to use:** To resolve a username to an on-chain address, or find the username associated with an address.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "usernames": {
+      "type": "string",
+      "description": "Comma-separated usernames to resolve (e.g., 'shinobi,sensei')"
+    },
+    "addresses": {
+      "type": "string",
+      "description": "Comma-separated addresses to resolve (e.g., '0x123...,0x456...')"
+    }
+  }
+}
+```
+
+**Note:** Provide at least one of `usernames` or `addresses`. Both can be used in the same call.
+
+**Output:** Array of `username:address` pairs
+
+**Example (by username):**
+```bash
+controller lookup --usernames shinobi,sensei --json
+```
+
+**Example (by address):**
+```bash
+controller lookup --addresses 0x123...,0x456... --json
+```
+
+---
+
 ### controller_clear
 
 Clear all stored session data and keypairs.

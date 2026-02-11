@@ -105,6 +105,17 @@ enum Commands {
         #[arg(long)]
         yes: bool,
     },
+
+    /// Look up controller addresses by usernames or usernames by addresses
+    Lookup {
+        /// Comma-separated usernames to resolve (e.g., 'shinobi,sensei')
+        #[arg(long)]
+        usernames: Option<String>,
+
+        /// Comma-separated addresses to resolve (e.g., '0x123...,0x456...')
+        #[arg(long)]
+        addresses: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -168,6 +179,10 @@ async fn main() {
         }
         Commands::Status => commands::status::execute(&config, &*formatter).await,
         Commands::Clear { yes } => commands::clear::execute(&config, &*formatter, yes).await,
+        Commands::Lookup {
+            usernames,
+            addresses,
+        } => commands::lookup::execute(&config, &*formatter, usernames, addresses).await,
     };
 
     if let Err(e) = result {

@@ -32,11 +32,12 @@ git clone https://github.com/cartridge-gg/controller-cli.git /tmp/controller-cli
   ln -sf /tmp/controller-cli/.claude/skills/controller-skill ~/.claude/skills/controller-skill
 ```
 
-Once installed, 5 tools become available:
+Once installed, 6 tools become available:
 - `controller_generate_keypair` - Generate session keypair
 - `controller_status` - Check session status
 - `controller_register_session` - Register session (requires human auth)
 - `controller_execute` - Execute transactions
+- `controller_lookup` - Look up usernames/addresses
 - `controller_clear` - Clear session data
 
 **See:** [Skill Documentation](./.claude/skills/controller-skill/README.md)
@@ -202,7 +203,34 @@ Output:
 - **Mainnet:** `https://voyager.online/tx/0x...`
 - **Sepolia:** `https://sepolia.voyager.online/tx/0x...`
 
-### 5. Wait for Confirmation (Optional)
+### 5. Look Up Usernames / Addresses
+
+Resolve Cartridge controller usernames to addresses or vice versa:
+
+```bash
+# Look up addresses for usernames
+controller lookup --usernames shinobi,sensei --json
+```
+
+```bash
+# Look up usernames for addresses
+controller lookup --addresses 0x123...,0x456... --json
+```
+
+Output:
+```json
+{
+  "status": "success",
+  "data": [
+    "shinobi:0x123...",
+    "sensei:0x456..."
+  ]
+}
+```
+
+Each entry is a `username:address` pair. You can combine both flags in a single call. See the [Cartridge Usernames API](https://docs.cartridge.gg/controller/usernames) for limits and rate-limiting details.
+
+### 6. Wait for Confirmation (Optional)
 
 Add `--wait` to wait for transaction confirmation (default 300 second timeout):
 
@@ -305,6 +333,32 @@ calldata: ["0xrecipient", "0x64", "0x0"]
 ```
 
 For amounts that fit in u128 (most cases), set high to `0x0`.
+
+---
+
+## Use Cases
+
+The lookup + execute commands combine to enable natural-language workflows. An LLM can resolve usernames to addresses transparently, then build the right transaction.
+
+### Send tokens to a username
+
+> "Send 1 STRK to broody"
+
+1. `controller lookup --usernames broody --json` → resolves to `broody:0xABC...`
+2. `controller execute --contract 0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d --entrypoint transfer --calldata 0xABC...,0xDE0B6B3A7640000,0x0 --json`
+
+### Interact with a game using a player's username
+
+> "Attack loaf's realm at grid 1,2"
+
+1. `controller lookup --usernames loaf --json` → resolves to `loaf:0xDEF...`
+2. `controller execute --contract 0xGAME_CONTRACT --entrypoint attack --calldata 0xDEF...,0x1,0x2 --json`
+
+### Check who owns an address
+
+> "Who is 0x123...?"
+
+1. `controller lookup --addresses 0x123... --json` → resolves to `shinobi:0x123...`
 
 ---
 
