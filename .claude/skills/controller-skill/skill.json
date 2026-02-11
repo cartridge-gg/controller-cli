@@ -79,6 +79,28 @@
       "command": "controller execute {contract:--contract} {entrypoint:--entrypoint} {calldata:--calldata} {file:--file} {wait:--wait} {timeout:--timeout} --json"
     },
     {
+      "name": "controller_lookup",
+      "description": "Look up Cartridge controller addresses by usernames or usernames by addresses. Returns username:address pairs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "usernames": {
+            "type": "string",
+            "description": "Comma-separated usernames to resolve to addresses (e.g., 'shinobi,sensei')"
+          },
+          "addresses": {
+            "type": "string",
+            "description": "Comma-separated addresses to resolve to usernames (e.g., '0x123...,0x456...')"
+          }
+        },
+        "anyOf": [
+          {"required": ["usernames"]},
+          {"required": ["addresses"]}
+        ]
+      },
+      "command": "controller lookup {usernames:--usernames} {addresses:--addresses} --json"
+    },
+    {
       "name": "controller_clear",
       "description": "Clear all stored session data and keypairs. Use to reset or troubleshoot.",
       "inputSchema": {
@@ -127,6 +149,20 @@
       "input": {
         "file": "calls.json",
         "wait": true
+      }
+    },
+    {
+      "title": "Look Up Usernames",
+      "tool": "controller_lookup",
+      "input": {
+        "usernames": "shinobi,sensei"
+      }
+    },
+    {
+      "title": "Look Up Addresses",
+      "tool": "controller_lookup",
+      "input": {
+        "addresses": "0x123...,0x456..."
       }
     }
   ],

@@ -45,6 +45,7 @@ Once the skill is installed, you can ask Claude to:
 - "Generate a new controller keypair"
 - "Send 100 STRK to 0xabc123"
 - "Execute a transaction on Starknet"
+- "Look up the address for username shinobi"
 
 ## Example Usage
 
@@ -94,7 +95,8 @@ You can create custom policy files for your specific contracts and methods.
 2. **controller_status** - Check session status
 3. **controller_register_session** - Register new session (requires browser auth)
 4. **controller_execute** - Execute transactions
-5. **controller_clear** - Clear session data
+5. **controller_lookup** - Look up usernames/addresses
+6. **controller_clear** - Clear session data
 
 ## Security
 
