@@ -56,13 +56,13 @@ The CLI generates an authorization URL, displays it, then automatically polls un
 
 ### 3. Execute Transactions
 
-**Single call:**
+**Single call (positional args):**
 
 ```bash
 controller execute \
-  --contract 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
-  --entrypoint transfer \
-  --calldata 0xrecipient,0x100,0x0
+  0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
+  transfer \
+  0xrecipient,0x100,0x0
 ```
 
 **Multiple calls from file:**
@@ -79,7 +79,26 @@ controller execute --file calls.json --wait --timeout 300
 
 Transactions are auto-subsidized via paymaster when possible. Use `--no-paymaster` to pay with user funds directly.
 
-### 4. Check Status
+### 4. Read-Only Calls
+
+```bash
+controller call \
+  0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
+  balance_of \
+  0xaddress
+```
+
+Use `--block-id` to query at a specific block (`latest`, `pending`, a block number, or block hash).
+
+### 5. Get Transaction Status
+
+```bash
+controller transaction 0xTRANSACTION_HASH --chain-id SN_SEPOLIA
+```
+
+Add `--wait` to poll until the transaction is confirmed.
+
+### 6. Check Status
 
 ```bash
 controller status
@@ -87,7 +106,7 @@ controller status
 
 Returns `no_session`, `keypair_only`, or `active` with expiration details.
 
-### 5. Look Up Usernames / Addresses
+### 7. Look Up Usernames / Addresses
 
 ```bash
 # Resolve usernames to addresses
@@ -99,7 +118,7 @@ controller lookup --addresses 0x123...,0x456...
 
 Returns `username:address` pairs. See the [Cartridge Usernames docs](https://docs.cartridge.gg/controller/usernames) for API details.
 
-### 6. Clear Session
+### 8. Clear Session
 
 ```bash
 controller clear

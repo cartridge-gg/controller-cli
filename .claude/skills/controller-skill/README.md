@@ -79,6 +79,22 @@ Claude: [Uses controller_execute]
 Claude: "Transaction submitted! Hash: 0x789..."
 ```
 
+### Read-Only Call
+```
+You: "Check my STRK balance"
+
+Claude: [Uses controller_call]
+Claude: "Your balance is 1000 STRK"
+```
+
+### Check Transaction
+```
+You: "What's the status of transaction 0x789...?"
+
+Claude: [Uses controller_transaction]
+Claude: "Transaction 0x789... has been confirmed."
+```
+
 ## Policy Files
 
 The skill includes example policy files in the `examples/` directory:
@@ -94,9 +110,11 @@ You can create custom policy files for your specific contracts and methods.
 1. **controller_generate_keypair** - Generate session keypair
 2. **controller_status** - Check session status
 3. **controller_register_session** - Register new session (requires browser auth)
-4. **controller_execute** - Execute transactions
-5. **controller_lookup** - Look up usernames/addresses
-6. **controller_clear** - Clear session data
+4. **controller_execute** - Execute transactions (positional args: contract, entrypoint, calldata)
+5. **controller_call** - Read-only contract calls (positional args: contract, entrypoint, calldata)
+6. **controller_transaction** - Get transaction status and details
+7. **controller_lookup** - Look up usernames/addresses
+8. **controller_clear** - Clear session data
 
 ## Security
 

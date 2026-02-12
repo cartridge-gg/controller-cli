@@ -133,19 +133,19 @@ Execute a Starknet transaction using the active session.
   "properties": {
     "contract": {
       "type": "string",
-      "description": "Contract address (hex with 0x prefix)"
+      "description": "Contract address (positional, hex with 0x prefix)"
     },
     "entrypoint": {
       "type": "string",
-      "description": "Function name to call"
+      "description": "Function name to call (positional)"
     },
     "calldata": {
       "type": "string",
-      "description": "Comma-separated calldata values (hex with 0x prefix)"
+      "description": "Comma-separated calldata values (positional, hex with 0x prefix)"
     },
     "file": {
       "type": "string",
-      "description": "Path to JSON file with multiple calls (alternative to contract/entrypoint/calldata)"
+      "description": "Path to JSON file with multiple calls (alternative to positional args)"
     },
     "wait": {
       "type": "boolean",
@@ -161,14 +161,14 @@ Execute a Starknet transaction using the active session.
 }
 ```
 
-**Note:** Either provide `contract`+`entrypoint`+`calldata` for a single call, OR provide `file` for multiple calls.
+**Note:** Either provide positional `contract` `entrypoint` `calldata` for a single call, OR provide `--file` for multiple calls.
 
-**Example (single call):**
+**Example (single call — positional args):**
 ```bash
 controller execute \
-  --contract 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
-  --entrypoint transfer \
-  --calldata 0xRECIPIENT_ADDRESS,0x64,0x0 \
+  0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
+  transfer \
+  0xRECIPIENT_ADDRESS,0x64,0x0 \
   --json
 ```
 
@@ -188,6 +188,118 @@ controller execute --file calls.json --json
     }
   ]
 }
+```
+
+---
+
+### controller_call
+
+Execute a read-only call to a contract (no session required).
+
+**When to use:** To query contract state such as balances, allowances, or game state without submitting a transaction.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "contract": {
+      "type": "string",
+      "description": "Contract address (positional, hex with 0x prefix)"
+    },
+    "entrypoint": {
+      "type": "string",
+      "description": "Function name to call (positional)"
+    },
+    "calldata": {
+      "type": "string",
+      "description": "Comma-separated calldata values (positional, hex with 0x prefix)"
+    },
+    "file": {
+      "type": "string",
+      "description": "Path to JSON file with multiple calls (alternative to positional args)"
+    },
+    "chain_id": {
+      "type": "string",
+      "description": "Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA')"
+    },
+    "rpc_url": {
+      "type": "string",
+      "description": "RPC URL (overrides config, conflicts with chain_id)"
+    },
+    "block_id": {
+      "type": "string",
+      "description": "Block ID to query (latest, pending, block number, or block hash)"
+    }
+  }
+}
+```
+
+**Note:** Does not require an active session. Only needs a network via `--chain-id` or `--rpc-url`.
+
+**Example (positional args):**
+```bash
+controller call \
+  0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
+  balance_of \
+  0xADDRESS \
+  --chain-id SN_SEPOLIA \
+  --json
+```
+
+**Example (from file):**
+```bash
+controller call --file calls.json --chain-id SN_SEPOLIA --json
+```
+
+---
+
+### controller_transaction
+
+Get transaction status and details.
+
+**When to use:** To check whether a previously submitted transaction has been confirmed, or to wait for confirmation.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "hash": {
+      "type": "string",
+      "description": "Transaction hash (positional)"
+    },
+    "chain_id": {
+      "type": "string",
+      "description": "Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA')"
+    },
+    "rpc_url": {
+      "type": "string",
+      "description": "RPC URL (overrides config, conflicts with chain_id)"
+    },
+    "wait": {
+      "type": "boolean",
+      "description": "Wait for transaction to be confirmed (default: false)",
+      "default": false
+    },
+    "timeout": {
+      "type": "number",
+      "description": "Timeout in seconds when waiting (default: 300)",
+      "default": 300
+    }
+  },
+  "required": ["hash"]
+}
+```
+
+**Example:**
+```bash
+controller transaction 0xTRANSACTION_HASH --chain-id SN_SEPOLIA --json
+```
+
+**Example (wait for confirmation):**
+```bash
+controller transaction 0xTRANSACTION_HASH --chain-id SN_SEPOLIA --wait --json
 ```
 
 ---
@@ -276,9 +388,9 @@ controller status --json
 
 # Transfer 100 tokens (amount in u256: low, high)
 controller execute \
-  --contract 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
-  --entrypoint transfer \
-  --calldata 0xRECIPIENT_ADDRESS,0x64,0x0 \
+  0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
+  transfer \
+  0xRECIPIENT_ADDRESS,0x64,0x0 \
   --json
 ```
 
@@ -358,7 +470,7 @@ Agent: "Please open the URL above and authorize the session. I'll wait..."
 > Result: {"message": "Session registered successfully"}
 
 Agent: "Great! Now executing the transfer..."
-> controller execute --contract 0x04718f5... --entrypoint transfer --calldata 0xabc123,0x64,0x0 --json
+> controller execute 0x04718f5... transfer 0xabc123,0x64,0x0 --json
 > Result: {"transaction_hash": "0x789..."}
 
 Agent: "✅ Transfer submitted! Transaction hash: 0x789..."
