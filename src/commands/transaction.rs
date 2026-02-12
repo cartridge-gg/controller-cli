@@ -20,18 +20,17 @@ pub async fn execute(
 
     // Build the provider
     let url = url::Url::parse(&rpc_url)
-        .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {}", e)))?;
+        .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {e}")))?;
     let provider = JsonRpcClient::new(HttpTransport::new(url));
 
     // Validate transaction hash
     let tx_hash = Felt::from_hex(&hash)
-        .map_err(|e| CliError::InvalidInput(format!("Invalid transaction hash: {}", e)))?;
+        .map_err(|e| CliError::InvalidInput(format!("Invalid transaction hash: {e}")))?;
 
     // Wait for confirmation if requested
     if wait {
         formatter.info(&format!(
-            "Waiting for transaction {} to be confirmed (timeout: {}s)...",
-            hash, timeout
+            "Waiting for transaction {hash} to be confirmed (timeout: {timeout}s)..."
         ));
 
         let start = std::time::Instant::now();
@@ -40,8 +39,7 @@ pub async fn execute(
         loop {
             if start.elapsed() > timeout_duration {
                 return Err(CliError::TimeoutError(format!(
-                    "Transaction {} not confirmed within {} seconds",
-                    hash, timeout
+                    "Transaction {hash} not confirmed within {timeout} seconds"
                 )));
             }
 
@@ -66,8 +64,7 @@ pub async fn execute(
             Ok(())
         }
         None => Err(CliError::NotFoundError(format!(
-            "Transaction {} not found",
-            hash
+            "Transaction {hash} not found"
         ))),
     }
 }
@@ -84,19 +81,19 @@ async fn get_transaction(
             let output = match tx {
                 starknet::core::types::Transaction::Invoke(invoke) => match invoke {
                     starknet::core::types::InvokeTransaction::V3(invoke_v3) => TransactionOutput {
-                        transaction_hash: format!("0x{:x}", tx_hash),
+                        transaction_hash: format!("0x{tx_hash:x}"),
                         r#type: "INVOKE".to_string(),
                         sender_address: Some(format!("0x{:x}", invoke_v3.sender_address)),
                         calldata: invoke_v3
                             .calldata
                             .iter()
-                            .map(|f| format!("0x{:x}", f))
+                            .map(|f| format!("0x{f:x}"))
                             .collect(),
                         version: "0x3".to_string(),
                         signature: invoke_v3
                             .signature
                             .iter()
-                            .map(|f| format!("0x{:x}", f))
+                            .map(|f| format!("0x{f:x}"))
                             .collect(),
                         nonce: format!("0x{:x}", invoke_v3.nonce),
                         resource_bounds: Some(ResourceBounds {
@@ -135,12 +132,12 @@ async fn get_transaction(
                         paymaster_data: invoke_v3
                             .paymaster_data
                             .iter()
-                            .map(|f| format!("0x{:x}", f))
+                            .map(|f| format!("0x{f:x}"))
                             .collect(),
                         account_deployment_data: invoke_v3
                             .account_deployment_data
                             .iter()
-                            .map(|f| format!("0x{:x}", f))
+                            .map(|f| format!("0x{f:x}"))
                             .collect(),
                         nonce_data_availability_mode: format!(
                             "{:?}",
@@ -152,7 +149,7 @@ async fn get_transaction(
                         ),
                     },
                     _ => TransactionOutput {
-                        transaction_hash: format!("0x{:x}", tx_hash),
+                        transaction_hash: format!("0x{tx_hash:x}"),
                         r#type: "INVOKE".to_string(),
                         sender_address: None,
                         calldata: vec![],
@@ -168,7 +165,7 @@ async fn get_transaction(
                     },
                 },
                 starknet::core::types::Transaction::Declare(_) => TransactionOutput {
-                    transaction_hash: format!("0x{:x}", tx_hash),
+                    transaction_hash: format!("0x{tx_hash:x}"),
                     r#type: "DECLARE".to_string(),
                     sender_address: None,
                     calldata: vec![],
@@ -183,7 +180,7 @@ async fn get_transaction(
                     fee_data_availability_mode: "L1".to_string(),
                 },
                 starknet::core::types::Transaction::DeployAccount(_) => TransactionOutput {
-                    transaction_hash: format!("0x{:x}", tx_hash),
+                    transaction_hash: format!("0x{tx_hash:x}"),
                     r#type: "DEPLOY_ACCOUNT".to_string(),
                     sender_address: None,
                     calldata: vec![],
@@ -198,7 +195,7 @@ async fn get_transaction(
                     fee_data_availability_mode: "L1".to_string(),
                 },
                 starknet::core::types::Transaction::L1Handler(_) => TransactionOutput {
-                    transaction_hash: format!("0x{:x}", tx_hash),
+                    transaction_hash: format!("0x{tx_hash:x}"),
                     r#type: "L1_HANDLER".to_string(),
                     sender_address: None,
                     calldata: vec![],
@@ -213,7 +210,7 @@ async fn get_transaction(
                     fee_data_availability_mode: "L1".to_string(),
                 },
                 starknet::core::types::Transaction::Deploy(_) => TransactionOutput {
-                    transaction_hash: format!("0x{:x}", tx_hash),
+                    transaction_hash: format!("0x{tx_hash:x}"),
                     r#type: "DEPLOY".to_string(),
                     sender_address: None,
                     calldata: vec![],
@@ -234,8 +231,7 @@ async fn get_transaction(
             starknet::core::types::StarknetError::TransactionHashNotFound,
         )) => Ok(None),
         Err(e) => Err(CliError::ApiError(format!(
-            "Failed to get transaction: {}",
-            e
+            "Failed to get transaction: {e}"
         ))),
     }
 }
@@ -301,8 +297,7 @@ fn resolve_rpc_url(
             "SN_MAIN" => Ok("https://api.cartridge.gg/x/starknet/mainnet".to_string()),
             "SN_SEPOLIA" => Ok("https://api.cartridge.gg/x/starknet/sepolia".to_string()),
             _ => Err(CliError::InvalidInput(format!(
-                "Unsupported chain ID '{}'. Supported chains: SN_MAIN, SN_SEPOLIA",
-                chain
+                "Unsupported chain ID '{chain}'. Supported chains: SN_MAIN, SN_SEPOLIA"
             ))),
         }
     } else if !config.session.default_rpc_url.is_empty() {

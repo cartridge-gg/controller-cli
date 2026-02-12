@@ -53,7 +53,7 @@ pub async fn execute(
     // Get session data either from argument or file
     let data = if let Some(file_path) = from_file {
         std::fs::read_to_string(&file_path)
-            .map_err(|e| CliError::InvalidInput(format!("Failed to read file: {}", e)))?
+            .map_err(|e| CliError::InvalidInput(format!("Failed to read file: {e}")))?
             .trim()
             .to_string()
     } else if let Some(data) = session_data {
@@ -67,15 +67,14 @@ pub async fn execute(
     // Decode base64 session data
     let decoded = general_purpose::STANDARD
         .decode(data.trim())
-        .map_err(|e| CliError::InvalidSessionData(format!("Failed to decode base64: {}", e)))?;
+        .map_err(|e| CliError::InvalidSessionData(format!("Failed to decode base64: {e}")))?;
 
-    let session_str = String::from_utf8(decoded).map_err(|e| {
-        CliError::InvalidSessionData(format!("Invalid UTF-8 in session data: {}", e))
-    })?;
+    let session_str = String::from_utf8(decoded)
+        .map_err(|e| CliError::InvalidSessionData(format!("Invalid UTF-8 in session data: {e}")))?;
 
     // Parse session registration
     let registration: SessionRegistration = serde_json::from_str(&session_str)
-        .map_err(|e| CliError::InvalidSessionData(format!("Failed to parse JSON: {}", e)))?;
+        .map_err(|e| CliError::InvalidSessionData(format!("Failed to parse JSON: {e}")))?;
 
     // Load the stored keypair to get session key GUID
     let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
@@ -94,30 +93,29 @@ pub async fn execute(
 
     // Parse Felt values
     let address = Felt::from_hex(&registration.address)
-        .map_err(|e| CliError::InvalidSessionData(format!("Invalid address: {}", e)))?;
+        .map_err(|e| CliError::InvalidSessionData(format!("Invalid address: {e}")))?;
 
     let owner_guid = Felt::from_hex(&registration.owner_guid)
-        .map_err(|e| CliError::InvalidSessionData(format!("Invalid owner GUID: {}", e)))?;
+        .map_err(|e| CliError::InvalidSessionData(format!("Invalid owner GUID: {e}")))?;
 
     let expires_at = registration
         .expires_at
         .parse::<u64>()
-        .map_err(|e| CliError::InvalidSessionData(format!("Invalid expiration: {}", e)))?;
+        .map_err(|e| CliError::InvalidSessionData(format!("Invalid expiration: {e}")))?;
 
     // Use provided guids or defaults
     let guardian_key_guid = if registration.guardian_key_guid.is_empty() {
         Felt::ZERO
     } else {
-        Felt::from_hex(&registration.guardian_key_guid).map_err(|e| {
-            CliError::InvalidSessionData(format!("Invalid guardian key GUID: {}", e))
-        })?
+        Felt::from_hex(&registration.guardian_key_guid)
+            .map_err(|e| CliError::InvalidSessionData(format!("Invalid guardian key GUID: {e}")))?
     };
 
     let _metadata_hash = if registration.metadata_hash.is_empty() {
         Felt::ZERO
     } else {
         Felt::from_hex(&registration.metadata_hash)
-            .map_err(|e| CliError::InvalidSessionData(format!("Invalid metadata hash: {}", e)))?
+            .map_err(|e| CliError::InvalidSessionData(format!("Invalid metadata hash: {e}")))?
     };
 
     // Get session key GUID from our stored keypair
@@ -134,7 +132,7 @@ pub async fn execute(
 
     // Create Session with empty policies (wildcard session)
     let session = Session::new_wildcard(expires_at, &session_signer, guardian_key_guid)
-        .map_err(|e| CliError::InvalidSessionData(format!("Failed to create session: {}", e)))?;
+        .map_err(|e| CliError::InvalidSessionData(format!("Failed to create session: {e}")))?;
 
     // Create SessionMetadata
     let session_metadata = SessionMetadata {
@@ -171,7 +169,7 @@ pub async fn execute(
     let output = StoreOutput {
         message: "Session stored successfully".to_string(),
         username: registration.username,
-        address: format!("0x{:x}", address),
+        address: format!("0x{address:x}"),
         expires_at,
         expires_at_formatted: expires_at_dt.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
     };

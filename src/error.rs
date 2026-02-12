@@ -2,12 +2,10 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum CliError {
-    #[error("Session not found. Run 'controller-cli generate-keypair' and 'controller-cli register-session' first")]
+    #[error("Session not found. Run 'controller generate' and 'controller register' first")]
     NoSession,
 
-    #[error(
-        "Session expired at {0}. Run 'controller-cli register-session' to create a new session"
-    )]
+    #[error("Session expired at {0}. Run 'controller register' to create a new session")]
     SessionExpired(String),
 
     #[error("Policy violation: {message}")]
@@ -76,10 +74,16 @@ impl CliError {
 
     pub fn recovery_hint(&self) -> Option<&'static str> {
         match self {
-            CliError::NoSession => Some("Run 'controller-cli generate-keypair' followed by 'controller-cli register-session' to set up a session"),
-            CliError::SessionExpired(_) => Some("Run 'controller-cli register-session' to create a new session"),
-            CliError::PolicyViolation { .. } => Some("Review your session policies or register a new session with updated policies"),
-            CliError::CallbackTimeout(_) => Some("Try running register-session again or use --redirect-mode manual"),
+            CliError::NoSession => Some(
+                "Run 'controller generate' followed by 'controller register' to set up a session",
+            ),
+            CliError::SessionExpired(_) => {
+                Some("Run 'controller register' to create a new session")
+            }
+            CliError::PolicyViolation { .. } => {
+                Some("Review your session policies or register a new session with updated policies")
+            }
+            CliError::CallbackTimeout(_) => Some("Try running register again"),
             _ => None,
         }
     }

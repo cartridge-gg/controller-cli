@@ -43,23 +43,21 @@ pub struct MethodConfig {
 
 /// Fetch preset configuration from GitHub
 pub async fn fetch_preset(preset_name: &str) -> Result<PresetConfig> {
-    let url = format!("{}/{}/config.json", PRESETS_BASE_URL, preset_name);
+    let url = format!("{PRESETS_BASE_URL}/{preset_name}/config.json");
 
     let response = reqwest::get(&url).await.map_err(|e| {
-        CliError::InvalidInput(format!("Failed to fetch preset '{}': {}", preset_name, e))
+        CliError::InvalidInput(format!("Failed to fetch preset '{preset_name}': {e}"))
     })?;
 
     if !response.status().is_success() {
         return Err(CliError::InvalidInput(format!(
-            "Preset '{}' not found. Check available presets at: https://github.com/cartridge-gg/presets/tree/main/configs",
-            preset_name
+            "Preset '{preset_name}' not found. Check available presets at: https://github.com/cartridge-gg/presets/tree/main/configs"
         )));
     }
 
     let preset: PresetConfig = response.json().await.map_err(|e| {
         CliError::InvalidInput(format!(
-            "Failed to parse preset '{}' configuration: {}",
-            preset_name, e
+            "Failed to parse preset '{preset_name}' configuration: {e}"
         ))
     })?;
 

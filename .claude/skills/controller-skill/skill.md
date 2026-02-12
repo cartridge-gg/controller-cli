@@ -22,7 +22,7 @@ Use this skill when the user wants to:
 
 ## Tools
 
-### controller_generate_keypair
+### controller_generate
 
 Generate a new session keypair for signing transactions.
 
@@ -40,7 +40,7 @@ Generate a new session keypair for signing transactions.
 
 **Example:**
 ```bash
-controller generate-keypair --json
+controller generate --json
 ```
 
 ---
@@ -68,7 +68,7 @@ controller status --json
 
 ---
 
-### controller_register_session
+### controller_register
 
 Register a new session with specific contract/method policies. Requires human to authorize via browser.
 
@@ -92,7 +92,7 @@ Register a new session with specific contract/method policies. Requires human to
 
 **Example:**
 ```bash
-controller register-session policy.json --json
+controller register --file policy.json --json
 ```
 
 **Policy file format:**
@@ -375,9 +375,9 @@ controller clear --yes
 ### First-Time Setup
 
 1. Check status: `controller_status`
-2. If no keypair: `controller_generate_keypair`
+2. If no keypair: `controller_generate`
 3. Create policy file with desired contracts/methods
-4. Register session: `controller_register_session` (user must authorize in browser)
+4. Register session: `controller_register` (user must authorize in browser)
 5. Execute transactions: `controller_execute`
 
 ### Transfer Tokens
@@ -398,7 +398,7 @@ controller execute \
 
 If status shows expired:
 1. Create/update policy file if needed
-2. Run `controller_register_session policy.json --json`
+2. Run `controller_register policy.json --json`
 3. User authorizes in browser
 4. Retry the transaction
 
@@ -406,11 +406,11 @@ If status shows expired:
 
 ### NoSession
 - **Cause:** No keypair found
-- **Fix:** Run `controller_generate_keypair`
+- **Fix:** Run `controller_generate`
 
 ### SessionExpired
 - **Cause:** Session expired
-- **Fix:** Run `controller_register_session policy.json` (user must re-authorize)
+- **Fix:** Run `controller_register policy.json` (user must re-authorize)
 
 ### ManualExecutionRequired
 - **Cause:** No authorized session for this transaction
@@ -453,14 +453,14 @@ Agent: [Checks status]
 > Result: {"status": "no_session"}
 
 Agent: "I need to set up a session first. Let me generate a keypair..."
-> controller generate-keypair --json
+> controller generate --json
 > Result: {"public_key": "0x123..."}
 
 Agent: [Creates policy file for STRK transfers]
 > Creates policy.json with STRK contract and transfer method
 
 Agent: "Now I need you to authorize this session. Please open this URL:"
-> controller register-session policy.json --json
+> controller register --file policy.json --json
 > Result: {"authorization_url": "https://x.cartridge.gg/session?..."}
 
 Agent: "Please open the URL above and authorize the session. I'll wait..."

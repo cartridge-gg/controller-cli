@@ -4,14 +4,14 @@
   "version": "0.1.0",
   "tools": [
     {
-      "name": "controller_generate_keypair",
+      "name": "controller_generate",
       "description": "Generate a new session keypair for signing Starknet transactions. First step in session setup.",
       "inputSchema": {
         "type": "object",
         "properties": {},
         "required": []
       },
-      "command": "controller generate-keypair --json"
+      "command": "controller generate --json"
     },
     {
       "name": "controller_status",
@@ -24,7 +24,7 @@
       "command": "controller status --json"
     },
     {
-      "name": "controller_register_session",
+      "name": "controller_register",
       "description": "Register a new session with specific contract/method policies. IMPORTANT: Requires human to authorize via browser. Display the authorization URL to the user and wait for them to authorize.",
       "inputSchema": {
         "type": "object",
@@ -36,7 +36,7 @@
         },
         "required": ["policy_file"]
       },
-      "command": "controller register-session {policy_file} --json"
+      "command": "controller register --file {policy_file} --json"
     },
     {
       "name": "controller_execute",
@@ -124,12 +124,12 @@
     },
     {
       "title": "Generate Keypair",
-      "tool": "controller_generate_keypair",
+      "tool": "controller_generate",
       "input": {}
     },
     {
       "title": "Register Session",
-      "tool": "controller_register_session",
+      "tool": "controller_register",
       "input": {
         "policy_file": "policy.json"
       }

@@ -23,7 +23,7 @@ pub async fn execute(
 
     // Build the provider
     let url = url::Url::parse(&rpc_url)
-        .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {}", e)))?;
+        .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {e}")))?;
     let provider = JsonRpcClient::new(HttpTransport::new(url));
 
     // Parse block ID (default to latest)
@@ -82,18 +82,17 @@ async fn execute_single_call(
     block_id: BlockId,
 ) -> Result<Vec<String>> {
     let contract_address = Felt::from_hex(&call.contract_address)
-        .map_err(|e| CliError::InvalidInput(format!("Invalid contract address: {}", e)))?;
+        .map_err(|e| CliError::InvalidInput(format!("Invalid contract address: {e}")))?;
 
     let selector = starknet::core::utils::get_selector_from_name(&call.entrypoint)
-        .map_err(|e| CliError::InvalidInput(format!("Invalid entrypoint name: {}", e)))?;
+        .map_err(|e| CliError::InvalidInput(format!("Invalid entrypoint name: {e}")))?;
 
     let calldata: Vec<Felt> = call
         .calldata
         .iter()
         .map(|s| {
-            Felt::from_hex(s).map_err(|e| {
-                CliError::InvalidInput(format!("Invalid calldata value '{}': {}", s, e))
-            })
+            Felt::from_hex(s)
+                .map_err(|e| CliError::InvalidInput(format!("Invalid calldata value '{s}': {e}")))
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -106,9 +105,9 @@ async fn execute_single_call(
     let result = provider
         .call(function_call, block_id)
         .await
-        .map_err(|e| CliError::TransactionFailed(format!("Call failed: {}", e)))?;
+        .map_err(|e| CliError::TransactionFailed(format!("Call failed: {e}")))?;
 
-    Ok(result.iter().map(|f| format!("0x{:x}", f)).collect())
+    Ok(result.iter().map(|f| format!("0x{f:x}")).collect())
 }
 
 fn parse_block_id(block_id: Option<String>) -> Result<BlockId> {
@@ -116,13 +115,13 @@ fn parse_block_id(block_id: Option<String>) -> Result<BlockId> {
         None | Some("latest") => Ok(BlockId::Tag(BlockTag::Latest)),
         Some(num) if num.starts_with("0x") => {
             let hash = Felt::from_hex(num)
-                .map_err(|e| CliError::InvalidInput(format!("Invalid block hash: {}", e)))?;
+                .map_err(|e| CliError::InvalidInput(format!("Invalid block hash: {e}")))?;
             Ok(BlockId::Hash(hash))
         }
         Some(num) => {
             let number = num
                 .parse::<u64>()
-                .map_err(|e| CliError::InvalidInput(format!("Invalid block number: {}", e)))?;
+                .map_err(|e| CliError::InvalidInput(format!("Invalid block number: {e}")))?;
             Ok(BlockId::Number(number))
         }
     }
@@ -142,7 +141,7 @@ fn parse_calls_file(file_path: &str) -> Result<Vec<ContractCall>> {
     })?;
 
     let file: CallsFile = serde_json::from_str(&content)
-        .map_err(|e| CliError::InvalidInput(format!("Invalid JSON in calls file: {}", e)))?;
+        .map_err(|e| CliError::InvalidInput(format!("Invalid JSON in calls file: {e}")))?;
 
     Ok(file.calls)
 }
@@ -192,8 +191,7 @@ fn resolve_rpc_url(
             "SN_MAIN" => Ok("https://api.cartridge.gg/x/starknet/mainnet".to_string()),
             "SN_SEPOLIA" => Ok("https://api.cartridge.gg/x/starknet/sepolia".to_string()),
             _ => Err(CliError::InvalidInput(format!(
-                "Unsupported chain ID '{}'. Supported chains: SN_MAIN, SN_SEPOLIA",
-                chain
+                "Unsupported chain ID '{chain}'. Supported chains: SN_MAIN, SN_SEPOLIA"
             ))),
         }
     } else if !config.session.default_rpc_url.is_empty() {

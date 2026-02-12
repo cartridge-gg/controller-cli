@@ -40,7 +40,7 @@ impl OutputFormatter for HumanFormatter {
         // Try to format the data as pretty JSON
         if let Ok(json) = serde_json::to_value(data) {
             if let Ok(pretty) = serde_json::to_string_pretty(&json) {
-                println!("\n{}", pretty);
+                println!("\n{pretty}");
             }
         }
     }
