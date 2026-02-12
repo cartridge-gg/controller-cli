@@ -141,7 +141,7 @@ Execute a Starknet transaction using the active session.
     },
     "calldata": {
       "type": "string",
-      "description": "Comma-separated calldata values. Supports: hex (0x64), decimal (100), u256: prefix (u256:1000 auto-splits to low,high), str: prefix (str:hello for short strings)"
+      "description": "Comma-separated calldata values (positional, hex with 0x prefix)"
     },
     "file": {
       "type": "string",
@@ -168,7 +168,7 @@ Execute a Starknet transaction using the active session.
 controller execute \
   0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
   transfer \
-  0xRECIPIENT_ADDRESS,u256:1000000000000000000 \
+  0xRECIPIENT_ADDRESS,0x64,0x0 \
   --json
 ```
 
@@ -184,7 +184,7 @@ controller execute --file calls.json --json
     {
       "contractAddress": "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
       "entrypoint": "transfer",
-      "calldata": ["0xRECIPIENT", "u256:1000000000000000000"]
+      "calldata": ["0xRECIPIENT", "0x100", "0x0"]
     }
   ]
 }
@@ -213,7 +213,7 @@ Execute a read-only call to a contract (no session required).
     },
     "calldata": {
       "type": "string",
-      "description": "Comma-separated calldata values. Supports: hex (0x64), decimal (100), u256: prefix (u256:1000 auto-splits to low,high), str: prefix (str:hello for short strings)"
+      "description": "Comma-separated calldata values (positional, hex with 0x prefix)"
     },
     "file": {
       "type": "string",
@@ -386,11 +386,11 @@ controller clear --yes
 # Check session is active
 controller status --json
 
-# Transfer 1 STRK using u256: prefix (auto-splits into low/high)
+# Transfer 100 tokens (amount in u256: low, high)
 controller execute \
-  0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d \
+  0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
   transfer \
-  0xRECIPIENT_ADDRESS,u256:1000000000000000000 \
+  0xRECIPIENT_ADDRESS,0x64,0x0 \
   --json
 ```
 
@@ -426,10 +426,9 @@ If status shows expired:
 
 2. **Session Expiration:** Sessions expire. Always check status before transactions.
 
-3. **U256 Amounts:** Use the `u256:` prefix for token amounts — it auto-splits into low/high felts:
-   - `u256:100` → expands to `0x64,0x0`
-   - `u256:1000000000000000000` → expands to `0xDE0B6B3A7640000,0x0`
-   - Manual split (`0x64,0x0`) still works but is no longer necessary
+3. **U256 Amounts:** Starknet uses u256 for amounts. Split into low/high:
+   - For 100: `0x64,0x0`
+   - For large amounts: calculate proper low/high split
 
 4. **Subsidized Transactions:** On Sepolia testnet, transactions are automatically subsidized (no ETH needed for gas).
 
@@ -471,7 +470,7 @@ Agent: "Please open the URL above and authorize the session. I'll wait..."
 > Result: {"message": "Session registered successfully"}
 
 Agent: "Great! Now executing the transfer..."
-> controller execute 0x04718f5... transfer 0xabc123,u256:100 --json
+> controller execute 0x04718f5... transfer 0xabc123,0x64,0x0 --json
 > Result: {"transaction_hash": "0x789..."}
 
 Agent: "✅ Transfer submitted! Transaction hash: 0x789..."
