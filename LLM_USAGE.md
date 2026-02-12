@@ -32,11 +32,13 @@ git clone https://github.com/cartridge-gg/controller-cli.git /tmp/controller-cli
   ln -sf /tmp/controller-cli/.claude/skills/controller-skill ~/.claude/skills/controller-skill
 ```
 
-Once installed, 6 tools become available:
+Once installed, 8 tools become available:
 - `controller_generate_keypair` - Generate session keypair
 - `controller_status` - Check session status
 - `controller_register_session` - Register session (requires human auth)
 - `controller_execute` - Execute transactions
+- `controller_call` - Read-only contract calls
+- `controller_transaction` - Get transaction status
 - `controller_lookup` - Look up usernames/addresses
 - `controller_clear` - Clear session data
 
@@ -156,12 +158,12 @@ JSON output:
 
 ### 4. Execute Transaction
 
-**Single call:**
+**Single call (positional args: contract, entrypoint, calldata):**
 ```bash
 controller execute \
-  --contract 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
-  --entrypoint transfer \
-  --calldata 0xRECIPIENT_ADDRESS,0xAMOUNT_LOW,0xAMOUNT_HIGH \
+  0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
+  transfer \
+  0xRECIPIENT_ADDRESS,0xAMOUNT_LOW,0xAMOUNT_HIGH \
   --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
   --json
 ```
@@ -203,7 +205,58 @@ Output:
 - **Mainnet:** `https://voyager.online/tx/0x...`
 - **Sepolia:** `https://sepolia.voyager.online/tx/0x...`
 
-### 5. Look Up Usernames / Addresses
+### 5. Read-Only Call
+
+Execute a read-only call to query contract state without submitting a transaction.
+
+**Single call (positional args: contract, entrypoint, calldata):**
+```bash
+controller call \
+  0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
+  balance_of \
+  0xADDRESS \
+  --chain-id SN_SEPOLIA \
+  --json
+```
+
+**Query at a specific block:**
+```bash
+controller call \
+  0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
+  balance_of \
+  0xADDRESS \
+  --chain-id SN_SEPOLIA \
+  --block-id latest \
+  --json
+```
+
+**Multiple calls from file:**
+```bash
+controller call --file calls.json --chain-id SN_SEPOLIA --json
+```
+
+**Note:** `call` does not require an active session. It only needs a network (via `--chain-id` or `--rpc-url`).
+
+### 6. Get Transaction Status
+
+Check the status and details of a submitted transaction.
+
+```bash
+controller transaction 0xTRANSACTION_HASH \
+  --chain-id SN_SEPOLIA \
+  --json
+```
+
+**Wait for confirmation:**
+```bash
+controller transaction 0xTRANSACTION_HASH \
+  --chain-id SN_SEPOLIA \
+  --wait \
+  --timeout 300 \
+  --json
+```
+
+### 7. Look Up Usernames / Addresses
 
 Resolve Cartridge controller usernames to addresses or vice versa:
 
@@ -230,7 +283,7 @@ Output:
 
 Each entry is a `username:address` pair. You can combine both flags in a single call. See the [Cartridge Usernames API](https://docs.cartridge.gg/controller/usernames) for limits and rate-limiting details.
 
-### 6. Wait for Confirmation (Optional)
+### 8. Wait for Confirmation (Optional)
 
 Add `--wait` to wait for transaction confirmation (default 300 second timeout):
 
@@ -283,9 +336,9 @@ Use `--no-paymaster` to bypass the paymaster and pay with user funds:
 
 ```bash
 controller execute \
-  --contract 0x... \
-  --entrypoint transfer \
-  --calldata 0x... \
+  0x... \
+  transfer \
+  0x... \
   --no-paymaster \
   --json
 ```
@@ -345,14 +398,14 @@ The lookup + execute commands combine to enable natural-language workflows. An L
 > "Send 1 STRK to broody"
 
 1. `controller lookup --usernames broody --json` → resolves to `broody:0xABC...`
-2. `controller execute --contract 0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d --entrypoint transfer --calldata 0xABC...,0xDE0B6B3A7640000,0x0 --json`
+2. `controller execute 0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d transfer 0xABC...,0xDE0B6B3A7640000,0x0 --json`
 
 ### Interact with a game using a player's username
 
 > "Attack loaf's realm at grid 1,2"
 
 1. `controller lookup --usernames loaf --json` → resolves to `loaf:0xDEF...`
-2. `controller execute --contract 0xGAME_CONTRACT --entrypoint attack --calldata 0xDEF...,0x1,0x2 --json`
+2. `controller execute 0xGAME_CONTRACT attack 0xDEF...,0x1,0x2 --json`
 
 ### Check who owns an address
 

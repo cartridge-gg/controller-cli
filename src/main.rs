@@ -63,16 +63,13 @@ enum Commands {
 
     /// Execute a transaction using the active session
     Execute {
-        /// Contract address
-        #[arg(long)]
+        /// Contract address (positional)
         contract: Option<String>,
 
-        /// Entrypoint/function name
-        #[arg(long)]
+        /// Entrypoint/function name (positional)
         entrypoint: Option<String>,
 
-        /// Calldata as comma-separated hex values
-        #[arg(long)]
+        /// Calldata as comma-separated hex values (positional)
         calldata: Option<String>,
 
         /// Read calls from JSON file
@@ -119,16 +116,13 @@ enum Commands {
 
     /// Execute a read-only call to a contract
     Call {
-        /// Contract address
-        #[arg(long)]
+        /// Contract address (positional)
         contract: Option<String>,
 
-        /// Entrypoint/function name
-        #[arg(long)]
+        /// Entrypoint/function name (positional)
         entrypoint: Option<String>,
 
-        /// Calldata as comma-separated hex values
-        #[arg(long)]
+        /// Calldata as comma-separated hex values (positional)
         calldata: Option<String>,
 
         /// Read calls from JSON file
