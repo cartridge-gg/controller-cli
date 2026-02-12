@@ -110,8 +110,11 @@ pub async fn execute(
                 )));
             }
         }
+    } else if let Some(ref url) = rpc_url {
+        Some(url.clone())
     } else {
-        rpc_url
+        formatter.warning("No --chain-id or --rpc-url specified, using SN_SEPOLIA by default");
+        Some("https://api.cartridge.gg/x/starknet/sepolia".to_string())
     };
 
     // Load the stored keypair
