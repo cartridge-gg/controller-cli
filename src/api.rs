@@ -13,7 +13,7 @@ pub async fn shorten_url(api_url: &str, long_url: &str) -> Result<String> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(5))
         .build()
-        .map_err(|e| CliError::ApiError(format!("Failed to build HTTP client: {}", e)))?;
+        .map_err(|e| CliError::ApiError(format!("Failed to build HTTP client: {e}")))?;
 
     #[derive(Serialize)]
     struct ShortenRequest<'a> {
@@ -26,11 +26,11 @@ pub async fn shorten_url(api_url: &str, long_url: &str) -> Result<String> {
     }
 
     let response = client
-        .post(format!("{}/s", api_base))
+        .post(format!("{api_base}/s"))
         .json(&ShortenRequest { url: long_url })
         .send()
         .await
-        .map_err(|e| CliError::ApiError(format!("Failed to shorten URL: {}", e)))?;
+        .map_err(|e| CliError::ApiError(format!("Failed to shorten URL: {e}")))?;
 
     if !response.status().is_success() {
         return Err(CliError::ApiError(format!(
@@ -42,7 +42,7 @@ pub async fn shorten_url(api_url: &str, long_url: &str) -> Result<String> {
     let shorten_response: ShortenResponse = response
         .json()
         .await
-        .map_err(|e| CliError::ApiError(format!("Failed to parse shortener response: {}", e)))?;
+        .map_err(|e| CliError::ApiError(format!("Failed to parse shortener response: {e}")))?;
 
     Ok(shorten_response.url)
 }
@@ -79,7 +79,7 @@ pub async fn query_session_info(
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(130)) // Slightly longer than backend's 2min timeout
         .build()
-        .map_err(|e| CliError::ApiError(format!("Failed to build HTTP client: {}", e)))?;
+        .map_err(|e| CliError::ApiError(format!("Failed to build HTTP client: {e}")))?;
 
     // This is a QUERY (not subscription) despite the name
     let query = r#"
@@ -142,7 +142,7 @@ pub async fn query_session_info(
         .json(&request)
         .send()
         .await
-        .map_err(|e| CliError::ApiError(format!("Failed to query session info: {}", e)))?;
+        .map_err(|e| CliError::ApiError(format!("Failed to query session info: {e}")))?;
 
     if !response.status().is_success() {
         return Err(CliError::ApiError(format!(
@@ -154,7 +154,7 @@ pub async fn query_session_info(
     let graphql_response: GraphQLResponse = response
         .json()
         .await
-        .map_err(|e| CliError::ApiError(format!("Failed to parse API response: {}", e)))?;
+        .map_err(|e| CliError::ApiError(format!("Failed to parse API response: {e}")))?;
 
     if let Some(errors) = graphql_response.errors {
         let error_messages: Vec<String> = errors.iter().map(|e| e.message.clone()).collect();
@@ -176,7 +176,7 @@ impl SessionInfo {
             .iter()
             .map(|hex| {
                 Felt::from_hex(hex).map_err(|e| {
-                    CliError::InvalidSessionData(format!("Invalid authorization hex: {}", e))
+                    CliError::InvalidSessionData(format!("Invalid authorization hex: {e}"))
                 })
             })
             .collect()
@@ -185,7 +185,7 @@ impl SessionInfo {
     /// Convert address string to Felt
     pub fn address_as_felt(&self) -> Result<Felt> {
         Felt::from_hex(&self.controller.address)
-            .map_err(|e| CliError::InvalidSessionData(format!("Invalid address hex: {}", e)))
+            .map_err(|e| CliError::InvalidSessionData(format!("Invalid address hex: {e}")))
     }
 
     /// Convert chain_id string to Felt

@@ -35,7 +35,7 @@ cargo install --git https://github.com/cartridge-gg/controller-cli
 ### 1. Generate a Keypair
 
 ```bash
-controller generate-keypair
+controller generate
 ```
 
 Creates and stores a new session keypair. The private key is stored locally — even if compromised, the session is scoped to only the authorized contracts, methods, and time window.
@@ -43,13 +43,13 @@ Creates and stores a new session keypair. The private key is stored locally — 
 ### 2. Register a Session
 
 ```bash
-controller register-session --file policies.json --chain-id SN_MAIN
+controller register --file policies.json --chain-id SN_MAIN
 ```
 
 Or use a preset for popular games/apps:
 
 ```bash
-controller register-session --preset loot-survivor --chain-id SN_MAIN
+controller register --preset loot-survivor --chain-id SN_MAIN
 ```
 
 The CLI generates an authorization URL, displays it, then automatically polls until you authorize in the browser and stores the session.

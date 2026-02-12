@@ -57,7 +57,7 @@ run:
 
 # Generate keypair (example)
 example-keygen:
-	cargo run -- generate-keypair
+	cargo run -- generate
 
 # Check status (example)
 example-status:

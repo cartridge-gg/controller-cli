@@ -154,12 +154,15 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
     formatter.success(&output);
 
     if status == "no_session" {
-        formatter.info("No session found. Run 'controller generate-keypair' to get started.");
+        formatter.info("No session found. Run 'controller generate' to get started.");
     } else if status == "keypair_only" {
-        formatter.info("Keypair found but no active session. Run 'controller register-session <policy.json>' to create a session.");
+        formatter.info(
+            "Keypair found but no active session. Run 'controller register' to create a session.",
+        );
     } else if let Some(session) = &output.session {
         if session.is_expired {
-            formatter.warning("Session has expired. Run 'controller register-session <policy.json>' to create a new session.");
+            formatter
+                .warning("Session has expired. Run 'controller register' to create a new session.");
         }
     }
 

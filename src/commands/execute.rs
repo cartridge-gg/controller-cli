@@ -52,10 +52,10 @@ pub async fn execute(
     let calls = if let Some(file_path) = file {
         // Load calls from JSON file
         let file_content = std::fs::read_to_string(&file_path)
-            .map_err(|e| CliError::InvalidInput(format!("Failed to read file: {}", e)))?;
+            .map_err(|e| CliError::InvalidInput(format!("Failed to read file: {e}")))?;
 
         let call_file: CallFile = serde_json::from_str(&file_content)
-            .map_err(|e| CliError::InvalidInput(format!("Invalid file format: {}", e)))?;
+            .map_err(|e| CliError::InvalidInput(format!("Invalid file format: {e}")))?;
 
         call_file.calls
     } else if let (Some(contract_addr), Some(entry), Some(data)) = (contract, entrypoint, calldata)
@@ -150,7 +150,7 @@ pub async fn execute(
         let provider = starknet::providers::jsonrpc::JsonRpcClient::new(
             starknet::providers::jsonrpc::HttpTransport::new(
                 url::Url::parse(&effective_rpc_url)
-                    .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {}", e)))?,
+                    .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {e}")))?,
             ),
         );
 
@@ -160,23 +160,21 @@ pub async fn execute(
                 if rpc_chain_id != controller_metadata.chain_id {
                     let rpc_chain_name =
                         starknet::core::utils::parse_cairo_short_string(&rpc_chain_id)
-                            .unwrap_or_else(|_| format!("0x{:x}", rpc_chain_id));
+                            .unwrap_or_else(|_| format!("0x{rpc_chain_id:x}"));
                     let session_chain_name = starknet::core::utils::parse_cairo_short_string(
                         &controller_metadata.chain_id,
                     )
                     .unwrap_or_else(|_| format!("0x{:x}", controller_metadata.chain_id));
 
                     return Err(CliError::InvalidInput(format!(
-                        "Chain ID mismatch: RPC endpoint is on {} but session is for {}",
-                        rpc_chain_name, session_chain_name
+                        "Chain ID mismatch: RPC endpoint is on {rpc_chain_name} but session is for {session_chain_name}"
                     )));
                 }
                 // Validation successful, continue
             }
             Err(e) => {
                 return Err(CliError::InvalidInput(format!(
-                    "RPC endpoint not responding: {}",
-                    e
+                    "RPC endpoint not responding: {e}"
                 )));
             }
         }
@@ -192,24 +190,24 @@ pub async fn execute(
         Some(backend),
     )
     .await
-    .map_err(|e| CliError::Storage(format!("Failed to create controller: {}", e)))?;
+    .map_err(|e| CliError::Storage(format!("Failed to create controller: {e}")))?;
 
     // Convert CallSpec to starknet Call
     let starknet_calls: Vec<Call> = calls
         .iter()
         .map(|call| {
             let contract_address = Felt::from_hex(&call.contract_address)
-                .map_err(|e| CliError::InvalidInput(format!("Invalid contract address: {}", e)))?;
+                .map_err(|e| CliError::InvalidInput(format!("Invalid contract address: {e}")))?;
 
             let selector = starknet::core::utils::get_selector_from_name(&call.entrypoint)
-                .map_err(|e| CliError::InvalidInput(format!("Invalid entrypoint: {}", e)))?;
+                .map_err(|e| CliError::InvalidInput(format!("Invalid entrypoint: {e}")))?;
 
             let calldata: Result<Vec<Felt>> = call
                 .calldata
                 .iter()
                 .map(|data| {
                     Felt::from_hex(data.trim())
-                        .map_err(|e| CliError::InvalidInput(format!("Invalid calldata: {}", e)))
+                        .map_err(|e| CliError::InvalidInput(format!("Invalid calldata: {e}")))
                 })
                 .collect();
 
@@ -228,11 +226,11 @@ pub async fn execute(
 
     let chain_name = match controller.provider.chain_id().await {
         Ok(felt) => starknet::core::utils::parse_cairo_short_string(&felt)
-            .unwrap_or_else(|_| format!("0x{:x}", felt)),
+            .unwrap_or_else(|_| format!("0x{felt:x}")),
         Err(_) => {
             let chain_id = controller_metadata.chain_id;
             starknet::core::utils::parse_cairo_short_string(&chain_id)
-                .unwrap_or_else(|_| format!("0x{:x}", chain_id))
+                .unwrap_or_else(|_| format!("0x{chain_id:x}"))
         }
     };
     let is_mainnet = chain_name == "SN_MAIN";
@@ -241,20 +239,19 @@ pub async fn execute(
     let result = if no_paymaster {
         // Force self-pay: estimate fee and execute directly
         formatter.info(&format!(
-            "Executing transaction on {} without paymaster...",
-            chain_name
+            "Executing transaction on {chain_name} without paymaster..."
         ));
         let estimate = controller
             .estimate_invoke_fee(starknet_calls.clone())
             .await
-            .map_err(|e| CliError::TransactionFailed(format!("Fee estimation failed: {}", e)))?;
+            .map_err(|e| CliError::TransactionFailed(format!("Fee estimation failed: {e}")))?;
         controller
             .execute(starknet_calls, Some(estimate), None)
             .await
-            .map_err(|e| CliError::TransactionFailed(format!("Transaction failed: {}", e)))?
+            .map_err(|e| CliError::TransactionFailed(format!("Transaction failed: {e}")))?
     } else {
         // Try paymaster first, fail if unavailable (no fallback)
-        formatter.info(&format!("Executing transaction on {}...", chain_name));
+        formatter.info(&format!("Executing transaction on {chain_name}..."));
         match controller
             .execute_from_outside_v3(starknet_calls, None)
             .await
@@ -262,8 +259,7 @@ pub async fn execute(
             Ok(result) => result,
             Err(e) => {
                 return Err(CliError::TransactionFailed(format!(
-                    "Paymaster execution failed: {}\nUse --no-paymaster to force self-pay",
-                    e
+                    "Paymaster execution failed: {e}\nUse --no-paymaster to force self-pay"
                 )));
             }
         }
@@ -285,8 +281,7 @@ pub async fn execute(
         formatter.success(&output);
     } else {
         formatter.info(&format!(
-            "Transaction: https://{}voyager.online/tx/{}",
-            voyager_subdomain, transaction_hash
+            "Transaction: https://{voyager_subdomain}voyager.online/tx/{transaction_hash}"
         ));
     }
 
@@ -300,8 +295,7 @@ pub async fn execute(
         loop {
             if start.elapsed() > timeout_duration {
                 return Err(CliError::TransactionFailed(format!(
-                    "Transaction confirmation timeout after {} seconds",
-                    timeout
+                    "Transaction confirmation timeout after {timeout} seconds"
                 )));
             }
 

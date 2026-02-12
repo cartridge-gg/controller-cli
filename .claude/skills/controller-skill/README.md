@@ -61,9 +61,9 @@ Claude: "You don't have an active session. Would you like me to set one up?"
 ```
 You: "Set up a session for STRK token transfers"
 
-Claude: [Uses controller_generate_keypair]
+Claude: [Uses controller_generate]
 Claude: [Creates policy file]
-Claude: [Uses controller_register_session]
+Claude: [Uses controller_register]
 Claude: "Please open this URL to authorize: https://x.cartridge.gg/session?..."
 
 You: [Opens URL and authorizes]
@@ -107,9 +107,9 @@ You can create custom policy files for your specific contracts and methods.
 
 ## Tools Available
 
-1. **controller_generate_keypair** - Generate session keypair
+1. **controller_generate** - Generate session keypair
 2. **controller_status** - Check session status
-3. **controller_register_session** - Register new session (requires browser auth)
+3. **controller_register** - Register new session (requires browser auth)
 4. **controller_execute** - Execute transactions (positional args: contract, entrypoint, calldata)
 5. **controller_call** - Read-only contract calls (positional args: contract, entrypoint, calldata)
 6. **controller_transaction** - Get transaction status and details

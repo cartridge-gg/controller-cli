@@ -74,8 +74,7 @@ where
         Ok(()) => true,
         Err(e) => {
             formatter.warning(&format!(
-                "Could not open browser automatically: {}. Please open the URL manually.",
-                e
+                "Could not open browser automatically: {e}. Please open the URL manually."
             ));
             false
         }
@@ -93,7 +92,7 @@ pub async fn execute(
     // Validate that either preset or file is provided
     if preset.is_none() && file.is_none() {
         return Err(CliError::InvalidInput(
-            "Either --preset or --file must be provided".to_string(),
+            "Session policies are required. Use --preset <name> to load a preset policy or --file <path> to provide a local policy JSON file".to_string(),
         ));
     }
 
@@ -104,9 +103,8 @@ pub async fn execute(
             "SN_SEPOLIA" => Some("https://api.cartridge.gg/x/starknet/sepolia".to_string()),
             _ => {
                 return Err(CliError::InvalidInput(format!(
-                    "Unsupported chain ID '{}'. Supported chains: SN_MAIN, SN_SEPOLIA. \
-                     For Cartridge SLOT or other chains, use --rpc-url to specify your Katana endpoint.",
-                    chain_id_str
+                    "Unsupported chain ID '{chain_id_str}'. Supported chains: SN_MAIN, SN_SEPOLIA. \
+                     For Cartridge SLOT or other chains, use --rpc-url to specify your Katana endpoint."
                 )));
             }
         }
@@ -139,7 +137,7 @@ pub async fn execute(
     // Load policies from preset or file
     let policy_file: PolicyFile = if let Some(preset_name) = preset {
         // Fetch preset from GitHub
-        formatter.info(&format!("Fetching preset '{}'...", preset_name));
+        formatter.info(&format!("Fetching preset '{preset_name}'..."));
         let preset_config = presets::fetch_preset(&preset_name).await?;
 
         // If resolved_rpc_url is provided, extract chain-specific policies
@@ -148,20 +146,20 @@ pub async fn execute(
             let provider = starknet::providers::jsonrpc::JsonRpcClient::new(
                 starknet::providers::jsonrpc::HttpTransport::new(
                     url::Url::parse(rpc_url_str)
-                        .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {}", e)))?,
+                        .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {e}")))?,
                 ),
             );
 
             let chain_id = starknet::providers::Provider::chain_id(&provider)
                 .await
                 .map_err(|e| {
-                    CliError::InvalidInput(format!("Failed to query chain_id from RPC: {}", e))
+                    CliError::InvalidInput(format!("Failed to query chain_id from RPC: {e}"))
                 })?;
 
             let chain_name = starknet::core::utils::parse_cairo_short_string(&chain_id)
-                .unwrap_or_else(|_| format!("0x{:x}", chain_id));
+                .unwrap_or_else(|_| format!("0x{chain_id:x}"));
 
-            formatter.info(&format!("Using policies for chain: {}", chain_name));
+            formatter.info(&format!("Using policies for chain: {chain_name}"));
 
             // Extract chain-specific policies
             let chain_policies =
@@ -213,10 +211,10 @@ pub async fn execute(
     } else if let Some(file_path) = file {
         // Load from local file
         let policy_content = std::fs::read_to_string(&file_path)
-            .map_err(|e| CliError::InvalidInput(format!("Failed to read policy file: {}", e)))?;
+            .map_err(|e| CliError::InvalidInput(format!("Failed to read policy file: {e}")))?;
 
         serde_json::from_str(&policy_content)
-            .map_err(|e| CliError::InvalidInput(format!("Invalid policy file format: {}", e)))?
+            .map_err(|e| CliError::InvalidInput(format!("Invalid policy file format: {e}")))?
     } else {
         unreachable!("Either preset or file must be provided");
     };
@@ -252,8 +250,7 @@ pub async fn execute(
                     let contract_address =
                         starknet::core::types::Felt::from_hex(address).map_err(|e| {
                             CliError::InvalidInput(format!(
-                                "Invalid contract address {}: {}",
-                                address, e
+                                "Invalid contract address {address}: {e}"
                             ))
                         })?;
 
@@ -290,7 +287,7 @@ pub async fn execute(
     }
 
     let policies_json = serde_json::to_string(&policies)
-        .map_err(|e| CliError::InvalidInput(format!("Failed to serialize policies: {}", e)))?;
+        .map_err(|e| CliError::InvalidInput(format!("Failed to serialize policies: {e}")))?;
     let parsed_policies = policy_vec;
 
     // Check if there's an active unexpired session for the same keypair
@@ -312,9 +309,8 @@ pub async fn execute(
                 }
             {
                 formatter.warning("Active session exists for this keypair. A session keypair can only be registered once.");
-                formatter.info(
-                    "Run 'controller generate-keypair' to create a new keypair, then re-register.",
-                );
+                formatter
+                    .info("Run 'controller generate' to create a new keypair, then re-register.");
                 return Ok(());
             }
         }
@@ -339,7 +335,7 @@ pub async fn execute(
     let provider = starknet::providers::jsonrpc::JsonRpcClient::new(
         starknet::providers::jsonrpc::HttpTransport::new(
             url::Url::parse(effective_rpc_url)
-                .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {}", e)))?,
+                .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {e}")))?,
         ),
     );
 
@@ -347,26 +343,25 @@ pub async fn execute(
         Ok(chain_id_felt) => {
             // Parse chain name for display
             let chain_name = starknet::core::utils::parse_cairo_short_string(&chain_id_felt)
-                .unwrap_or_else(|_| format!("0x{:x}", chain_id_felt));
+                .unwrap_or_else(|_| format!("0x{chain_id_felt:x}"));
             Some(chain_name)
         }
         Err(e) => {
             // Only error out if --rpc-url or --chain-id was explicitly provided
             if resolved_rpc_url.is_some() {
                 return Err(CliError::InvalidInput(format!(
-                    "RPC endpoint not responding: {}",
-                    e
+                    "RPC endpoint not responding: {e}"
                 )));
             }
             // If using default RPC from config, just log warning and continue
-            formatter.info(&format!("Warning: Could not query chain from RPC: {}", e));
+            formatter.info(&format!("Warning: Could not query chain from RPC: {e}"));
             None
         }
     };
 
     // Build the authorization URL
     let mut url = Url::parse(&format!("{}/session", config.session.keychain_url))
-        .map_err(|e| CliError::InvalidInput(format!("Invalid keychain URL: {}", e)))?;
+        .map_err(|e| CliError::InvalidInput(format!("Invalid keychain URL: {e}")))?;
 
     url.query_pairs_mut()
         .append_pair("public_key", &public_key)
@@ -399,11 +394,11 @@ pub async fn execute(
         formatter.success(&output);
     } else {
         if let Some(chain_name) = detected_chain_name {
-            formatter.info(&format!("Authorization URL ({}):", chain_name));
+            formatter.info(&format!("Authorization URL ({chain_name}):"));
         } else {
             formatter.info("Authorization URL:");
         }
-        println!("\n{}\n", display_url);
+        println!("\n{display_url}\n");
         formatter.info("Waiting for authorization (timeout: 5 minutes)...");
     }
 
@@ -414,10 +409,10 @@ pub async fn execute(
         use starknet_crypto::poseidon_hash;
 
         let pubkey_felt = starknet::core::types::Felt::from_hex(&public_key)
-            .map_err(|e| CliError::InvalidInput(format!("Invalid public key: {}", e)))?;
+            .map_err(|e| CliError::InvalidInput(format!("Invalid public key: {e}")))?;
 
         let guid = poseidon_hash(short_string!("Starknet Signer"), pubkey_felt);
-        format!("0x{:x}", guid)
+        format!("0x{guid:x}")
     };
 
     // Query with long-polling (backend holds connection for ~2 minutes)
@@ -455,9 +450,8 @@ pub async fn execute(
                 let policies_storage = PolicyStorage {
                     contracts: policy_file.contracts.clone(),
                 };
-                let policies_json = serde_json::to_string(&policies_storage).map_err(|e| {
-                    CliError::Storage(format!("Failed to serialize policies: {}", e))
-                })?;
+                let policies_json = serde_json::to_string(&policies_storage)
+                    .map_err(|e| CliError::Storage(format!("Failed to serialize policies: {e}")))?;
                 backend
                     .set("session_policies", &StorageValue::String(policies_json))
                     .map_err(|e| CliError::Storage(e.to_string()))?;
@@ -519,7 +513,7 @@ fn store_session_from_api(
 
     // Parse public key to create session signer
     let pubkey_felt = starknet::core::types::Felt::from_hex(public_key)
-        .map_err(|e| CliError::InvalidInput(format!("Invalid public key: {}", e)))?;
+        .map_err(|e| CliError::InvalidInput(format!("Invalid public key: {e}")))?;
 
     // Create StarknetSigner from public key (pubkey is already a Felt, no conversion needed)
     use cainome_cairo_serde::NonZero;
@@ -537,7 +531,7 @@ fn store_session_from_api(
         &session_signer,
         starknet::core::types::Felt::ZERO, // guardian_key_guid
     )
-    .map_err(|e| CliError::InvalidSessionData(format!("Failed to create session: {}", e)))?;
+    .map_err(|e| CliError::InvalidSessionData(format!("Failed to create session: {e}")))?;
 
     // Create session metadata
     let session_metadata = SessionMetadata {
@@ -564,7 +558,7 @@ fn store_session_from_api(
 
     // Store session and controller metadata using the correct key format
     // Key format: @cartridge/session/0x{address:x}/0x{chain_id:x}
-    let session_key = format!("@cartridge/session/0x{:x}/0x{:x}", address, chain_id);
+    let session_key = format!("@cartridge/session/0x{address:x}/0x{chain_id:x}");
 
     backend
         .set_session(&session_key, session_metadata)

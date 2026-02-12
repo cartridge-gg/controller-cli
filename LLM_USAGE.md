@@ -33,9 +33,9 @@ git clone https://github.com/cartridge-gg/controller-cli.git /tmp/controller-cli
 ```
 
 Once installed, 8 tools become available:
-- `controller_generate_keypair` - Generate session keypair
+- `controller_generate` - Generate session keypair
 - `controller_status` - Check session status
-- `controller_register_session` - Register session (requires human auth)
+- `controller_register` - Register session (requires human auth)
 - `controller_execute` - Execute transactions
 - `controller_call` - Read-only contract calls
 - `controller_transaction` - Get transaction status
@@ -51,7 +51,7 @@ Once installed, 8 tools become available:
 ### 1. Generate Keypair
 
 ```bash
-controller generate-keypair --json
+controller generate --json
 ```
 
 Output:
@@ -104,7 +104,7 @@ Active session output:
 For popular games/apps, use a preset from [cartridge-gg/presets](https://github.com/cartridge-gg/presets/tree/main/configs):
 
 ```bash
-controller register-session \
+controller register \
   --preset loot-survivor \
   --chain-id SN_MAIN \
   --json
@@ -133,7 +133,7 @@ Create `policy.json`:
 ```
 
 ```bash
-controller register-session \
+controller register \
   --file policy.json \
   --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
   --json
@@ -365,10 +365,10 @@ All errors return JSON:
 
 | Error Code | Cause | Recovery |
 |------------|-------|----------|
-| `NoSession` | No keypair found | Run `controller generate-keypair --json` |
-| `SessionExpired` | Session past expiry | Run `controller register-session` again |
+| `NoSession` | No keypair found | Run `controller generate --json` |
+| `SessionExpired` | Session past expiry | Run `controller register` again |
 | `ManualExecutionRequired` | No authorized session for this transaction | Register session with appropriate policies |
-| `CallbackTimeout` | User didn't authorize within 360s | Retry `register-session`, ask user to authorize faster |
+| `CallbackTimeout` | User didn't authorize within 360s | Retry `register`, ask user to authorize faster |
 | `InvalidInput` (UnsupportedChainId) | Bad chain ID | Use `SN_MAIN` or `SN_SEPOLIA`, or `--rpc-url` for custom chains |
 | `InvalidInput` (PresetNotFound) | Unknown preset name | Check [available presets](https://github.com/cartridge-gg/presets/tree/main/configs) |
 | `InvalidInput` (PresetChainNotSupported) | Preset doesn't support requested chain | Use a supported chain or create a custom policy file |

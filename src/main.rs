@@ -11,7 +11,7 @@ use config::Config;
 use output::create_formatter;
 
 #[derive(Parser)]
-#[command(name = "controller-cli")]
+#[command(name = "controller")]
 #[command(about = "CLI for Cartridge Controller session management", long_about = None)]
 #[command(version)]
 struct Cli {
@@ -30,10 +30,10 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Generate and store a new session keypair
-    GenerateKeypair,
+    Generate,
 
     /// Generate authorization URL for session registration
-    RegisterSession {
+    Register {
         /// Preset name (e.g., 'loot-survivor')
         #[arg(long, conflicts_with = "file")]
         preset: Option<String>,
@@ -52,13 +52,23 @@ enum Commands {
     },
 
     /// Manually store session credentials from authorization
-    StoreSession {
+    Store {
         /// Base64-encoded session data
         session_data: Option<String>,
 
         /// Read session data from file
         #[arg(long)]
         from_file: Option<String>,
+    },
+
+    /// Display current session status and information
+    Status,
+
+    /// Clear all stored session data
+    Clear {
+        /// Skip confirmation prompt
+        #[arg(long)]
+        yes: bool,
     },
 
     /// Execute a transaction using the active session
@@ -91,16 +101,6 @@ enum Commands {
         /// Force self-pay (don't use paymaster)
         #[arg(long)]
         no_paymaster: bool,
-    },
-
-    /// Display current session status and information
-    Status,
-
-    /// Clear all stored session data
-    Clear {
-        /// Skip confirmation prompt
-        #[arg(long)]
-        yes: bool,
     },
 
     /// Look up controller addresses by usernames or usernames by addresses
@@ -187,8 +187,8 @@ async fn main() {
     let update_check = tokio::spawn(version::check_for_update());
 
     let result = match cli.command {
-        Commands::GenerateKeypair => commands::generate::execute(&config, &*formatter).await,
-        Commands::RegisterSession {
+        Commands::Generate => commands::generate::execute(&config, &*formatter).await,
+        Commands::Register {
             preset,
             file,
             chain_id,
@@ -196,10 +196,12 @@ async fn main() {
         } => {
             commands::register::execute(&config, &*formatter, preset, file, chain_id, rpc_url).await
         }
-        Commands::StoreSession {
+        Commands::Store {
             session_data,
             from_file,
         } => commands::store::execute(&config, &*formatter, session_data, from_file).await,
+        Commands::Status => commands::status::execute(&config, &*formatter).await,
+        Commands::Clear { yes } => commands::clear::execute(&config, &*formatter, yes).await,
         Commands::Execute {
             contract,
             entrypoint,
@@ -224,8 +226,6 @@ async fn main() {
             )
             .await
         }
-        Commands::Status => commands::status::execute(&config, &*formatter).await,
-        Commands::Clear { yes } => commands::clear::execute(&config, &*formatter, yes).await,
         Commands::Lookup {
             usernames,
             addresses,

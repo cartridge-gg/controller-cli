@@ -52,7 +52,7 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
     } else {
         formatter
             .info("Keypair generated successfully. Use this public key for session registration.");
-        println!("\nPublic Key: {}\n", public_key);
+        println!("\nPublic Key: {public_key}\n");
     }
 
     Ok(())

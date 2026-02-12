@@ -108,9 +108,8 @@ pub async fn check_for_update() -> Option<String> {
                     .strip_prefix("cli-v")
                     .unwrap_or(&cache.latest_version);
                 Some(format!(
-                    "A new version of controller-cli is available: {} → {} \
-                     (update: curl -fsSL https://raw.githubusercontent.com/cartridge-gg/controller-cli/main/install.sh | bash)",
-                    CURRENT_VERSION, display
+                    "A new version of controller-cli is available: {CURRENT_VERSION} → {display} \
+                     (update: curl -fsSL https://raw.githubusercontent.com/cartridge-gg/controller-cli/main/install.sh | bash)"
                 ))
             } else {
                 None
@@ -125,9 +124,8 @@ pub async fn check_for_update() -> Option<String> {
     if is_newer(CURRENT_VERSION, &tag) {
         let display = tag.strip_prefix("cli-v").unwrap_or(&tag);
         Some(format!(
-            "A new version of controller-cli is available: {} → {} \
-             (update: curl -fsSL https://raw.githubusercontent.com/cartridge-gg/controller-cli/main/install.sh | bash)",
-            CURRENT_VERSION, display
+            "A new version of controller-cli is available: {CURRENT_VERSION} → {display} \
+             (update: curl -fsSL https://raw.githubusercontent.com/cartridge-gg/controller-cli/main/install.sh | bash)"
         ))
     } else {
         None
