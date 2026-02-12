@@ -54,7 +54,7 @@
           },
           "calldata": {
             "type": "string",
-            "description": "Comma-separated calldata values (hex with 0x prefix). Use with contract and entrypoint for single call."
+            "description": "Comma-separated calldata values. Supports: hex (0x64), decimal (100), u256: prefix (u256:1000 auto-splits to low,high), str: prefix (str:hello). Use with contract and entrypoint for single call."
           },
           "file": {
             "type": "string",
@@ -140,7 +140,7 @@
       "input": {
         "contract": "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
         "entrypoint": "transfer",
-        "calldata": "0xRECIPIENT,0x64,0x0"
+        "calldata": "0xRECIPIENT,u256:100"
       }
     },
     {

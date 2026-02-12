@@ -1,5 +1,5 @@
 use crate::{
-    commands::register::PolicyStorage,
+    commands::{calldata::parse_calldata_value, register::PolicyStorage},
     config::Config,
     error::{CliError, Result},
     output::OutputFormatter,
@@ -202,19 +202,19 @@ pub async fn execute(
             let selector = starknet::core::utils::get_selector_from_name(&call.entrypoint)
                 .map_err(|e| CliError::InvalidInput(format!("Invalid entrypoint: {e}")))?;
 
-            let calldata: Result<Vec<Felt>> = call
+            let calldata: Vec<Felt> = call
                 .calldata
                 .iter()
-                .map(|data| {
-                    Felt::from_hex(data.trim())
-                        .map_err(|e| CliError::InvalidInput(format!("Invalid calldata: {e}")))
-                })
+                .map(|data| parse_calldata_value(data.trim()))
+                .collect::<Result<Vec<Vec<Felt>>>>()?
+                .into_iter()
+                .flatten()
                 .collect();
 
             Ok(Call {
                 to: contract_address,
                 selector,
-                calldata: calldata?,
+                calldata,
             })
         })
         .collect::<Result<Vec<_>>>()?;

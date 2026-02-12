@@ -163,7 +163,7 @@ JSON output:
 controller execute \
   0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
   transfer \
-  0xRECIPIENT_ADDRESS,0xAMOUNT_LOW,0xAMOUNT_HIGH \
+  0xRECIPIENT_ADDRESS,u256:1000000000000000000 \
   --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
   --json
 ```
@@ -175,7 +175,7 @@ controller execute \
     {
       "contractAddress": "0x049d36...",
       "entrypoint": "approve",
-      "calldata": ["0xSPENDER", "0xFFFFFFFF", "0xFFFFFFFF"]
+      "calldata": ["0xSPENDER", "u256:1000000"]
     },
     {
       "contractAddress": "0x123abc...",
@@ -375,17 +375,45 @@ All errors return JSON:
 
 ---
 
-## Transaction Amounts (u256)
+## Calldata Formats
 
-Starknet uses u256 for token amounts, split into low/high u128:
+Calldata values support hex, decimal, and special prefixes:
 
+| Prefix | Example | Expands To | Use Case |
+|--------|---------|------------|----------|
+| (none) | `0x64` or `100` | `[felt]` | Hex or decimal felt |
+| `u256:` | `u256:1000000000000000000` | `[low, high]` | Token amounts — auto-splits into low/high 128-bit felts |
+| `str:` | `str:hello` | `[felt]` | Cairo short strings |
+
+### u256 Amounts
+
+The `u256:` prefix eliminates manual low/high splitting. Use it for token amounts:
+
+```bash
+# Before: manual split
+controller execute 0x04718f5... transfer 0xRECIPIENT,0xDE0B6B3A7640000,0x0 --json
+
+# After: u256 prefix (equivalent)
+controller execute 0x04718f5... transfer 0xRECIPIENT,u256:1000000000000000000 --json
 ```
-calldata: ["0xrecipient", "0x64", "0x0"]
-                           ^^^^   ^^^^
-                           low    high
+
+Both hex and decimal work with `u256:`:
+- `u256:1000000000000000000` (decimal)
+- `u256:0xDE0B6B3A7640000` (hex)
+
+### Decimal Values
+
+Plain decimal numbers are supported everywhere:
+```bash
+controller execute 0x04718f5... transfer 0xRECIPIENT,100,0 --json
 ```
 
-For amounts that fit in u128 (most cases), set high to `0x0`.
+### Short Strings
+
+Use `str:` for Cairo short strings:
+```bash
+controller execute 0x... set_name str:myname --json
+```
 
 ---
 
@@ -398,7 +426,7 @@ The lookup + execute commands combine to enable natural-language workflows. An L
 > "Send 1 STRK to broody"
 
 1. `controller lookup --usernames broody --json` → resolves to `broody:0xABC...`
-2. `controller execute 0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d transfer 0xABC...,0xDE0B6B3A7640000,0x0 --json`
+2. `controller execute 0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d transfer 0xABC...,u256:1000000000000000000 --json`
 
 ### Interact with a game using a player's username
 

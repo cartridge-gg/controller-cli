@@ -1,3 +1,4 @@
+use crate::commands::calldata::parse_calldata_value;
 use crate::config::Config;
 use crate::error::{CliError, Result};
 use crate::output::OutputFormatter;
@@ -90,11 +91,11 @@ async fn execute_single_call(
     let calldata: Vec<Felt> = call
         .calldata
         .iter()
-        .map(|s| {
-            Felt::from_hex(s)
-                .map_err(|e| CliError::InvalidInput(format!("Invalid calldata value '{s}': {e}")))
-        })
-        .collect::<Result<Vec<_>>>()?;
+        .map(|s| parse_calldata_value(s))
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .flatten()
+        .collect();
 
     let function_call = FunctionCall {
         contract_address,
