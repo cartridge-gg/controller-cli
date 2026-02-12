@@ -16,7 +16,7 @@ pub async fn execute(
     timeout: u64,
 ) -> Result<()> {
     // Determine RPC URL
-    let rpc_url = resolve_rpc_url(chain_id, rpc_url, config)?;
+    let rpc_url = resolve_rpc_url(chain_id, rpc_url, config, formatter)?;
 
     // Build the provider
     let url = url::Url::parse(&rpc_url)
@@ -288,6 +288,7 @@ fn resolve_rpc_url(
     chain_id: Option<String>,
     rpc_url: Option<String>,
     config: &Config,
+    formatter: &dyn OutputFormatter,
 ) -> Result<String> {
     // If explicit RPC URL provided, use it
     if let Some(url) = rpc_url {
@@ -304,8 +305,12 @@ fn resolve_rpc_url(
                 chain
             ))),
         }
-    } else {
+    } else if !config.session.default_rpc_url.is_empty() {
         // Fall back to config default
         Ok(config.session.default_rpc_url.clone())
+    } else {
+        // No chain_id, no rpc_url, no config default - use Sepolia with warning
+        formatter.warning("No --chain-id or --rpc-url specified, using SN_SEPOLIA by default");
+        Ok("https://api.cartridge.gg/x/starknet/sepolia".to_string())
     }
 }
