@@ -1,0 +1,203 @@
+use crate::config::Config;
+use crate::error::{CliError, Result};
+use crate::output::OutputFormatter;
+use serde::{Deserialize, Serialize};
+use starknet::core::types::{BlockId, BlockTag, Felt, FunctionCall};
+use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Provider};
+
+/// Execute a read-only call to a contract
+#[allow(clippy::too_many_arguments)]
+pub async fn execute(
+    config: &Config,
+    formatter: &dyn OutputFormatter,
+    contract: Option<String>,
+    entrypoint: Option<String>,
+    calldata: Option<String>,
+    file: Option<String>,
+    chain_id: Option<String>,
+    rpc_url: Option<String>,
+    block_id: Option<String>,
+) -> Result<()> {
+    // Determine RPC URL
+    let rpc_url = resolve_rpc_url(chain_id, rpc_url, config)?;
+
+    // Build the provider
+    let url = url::Url::parse(&rpc_url)
+        .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {}", e)))?;
+    let provider = JsonRpcClient::new(HttpTransport::new(url));
+
+    // Parse block ID (default to latest)
+    let block_id = parse_block_id(block_id)?;
+
+    // Handle file input for multiple calls
+    if let Some(file_path) = file {
+        let calls = parse_calls_file(&file_path)?;
+        let mut results = Vec::new();
+
+        for call in calls {
+            match execute_single_call(&provider, &call, block_id).await {
+                Ok(result) => results.push(CallResult {
+                    contract: call.contract_address.clone(),
+                    entrypoint: call.entrypoint.clone(),
+                    success: true,
+                    result: Some(result),
+                    error: None,
+                }),
+                Err(e) => results.push(CallResult {
+                    contract: call.contract_address.clone(),
+                    entrypoint: call.entrypoint.clone(),
+                    success: false,
+                    result: None,
+                    error: Some(e.to_string()),
+                }),
+            }
+        }
+
+        formatter.success(&CallBatchOutput { calls: results });
+        return Ok(());
+    }
+
+    // Handle single call
+    let contract = contract.ok_or_else(|| {
+        CliError::InvalidInput("Missing required argument: --contract".to_string())
+    })?;
+    let entrypoint = entrypoint.ok_or_else(|| {
+        CliError::InvalidInput("Missing required argument: --entrypoint".to_string())
+    })?;
+
+    let call = ContractCall {
+        contract_address: contract,
+        entrypoint,
+        calldata: parse_calldata(calldata)?,
+    };
+
+    let result = execute_single_call(&provider, &call, block_id).await?;
+
+    formatter.success(&result);
+    Ok(())
+}
+
+async fn execute_single_call(
+    provider: &JsonRpcClient<HttpTransport>,
+    call: &ContractCall,
+    block_id: BlockId,
+) -> Result<Vec<String>> {
+    let contract_address = Felt::from_hex(&call.contract_address)
+        .map_err(|e| CliError::InvalidInput(format!("Invalid contract address: {}", e)))?;
+
+    let selector = starknet::core::utils::get_selector_from_name(&call.entrypoint)
+        .map_err(|e| CliError::InvalidInput(format!("Invalid entrypoint name: {}", e)))?;
+
+    let calldata: Vec<Felt> = call
+        .calldata
+        .iter()
+        .map(|s| {
+            Felt::from_hex(s).map_err(|e| {
+                CliError::InvalidInput(format!("Invalid calldata value '{}': {}", s, e))
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let function_call = FunctionCall {
+        contract_address,
+        entry_point_selector: selector,
+        calldata,
+    };
+
+    let result = provider
+        .call(function_call, block_id)
+        .await
+        .map_err(|e| CliError::TransactionFailed(format!("Call failed: {}", e)))?;
+
+    Ok(result.iter().map(|f| format!("0x{:x}", f)).collect())
+}
+
+fn parse_block_id(block_id: Option<String>) -> Result<BlockId> {
+    match block_id.as_deref() {
+        None | Some("latest") => Ok(BlockId::Tag(BlockTag::Latest)),
+        Some(num) if num.starts_with("0x") => {
+            let hash = Felt::from_hex(num)
+                .map_err(|e| CliError::InvalidInput(format!("Invalid block hash: {}", e)))?;
+            Ok(BlockId::Hash(hash))
+        }
+        Some(num) => {
+            let number = num
+                .parse::<u64>()
+                .map_err(|e| CliError::InvalidInput(format!("Invalid block number: {}", e)))?;
+            Ok(BlockId::Number(number))
+        }
+    }
+}
+
+fn parse_calldata(calldata: Option<String>) -> Result<Vec<String>> {
+    match calldata {
+        None => Ok(Vec::new()),
+        Some(data) => Ok(data.split(',').map(|s| s.trim().to_string()).collect()),
+    }
+}
+
+fn parse_calls_file(file_path: &str) -> Result<Vec<ContractCall>> {
+    let content = std::fs::read_to_string(file_path).map_err(|e| CliError::FileError {
+        path: file_path.to_string(),
+        message: e.to_string(),
+    })?;
+
+    let file: CallsFile = serde_json::from_str(&content)
+        .map_err(|e| CliError::InvalidInput(format!("Invalid JSON in calls file: {}", e)))?;
+
+    Ok(file.calls)
+}
+
+#[derive(Debug, Deserialize)]
+struct CallsFile {
+    calls: Vec<ContractCall>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ContractCall {
+    #[serde(rename = "contractAddress")]
+    contract_address: String,
+    entrypoint: String,
+    calldata: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct CallResult {
+    contract: String,
+    entrypoint: String,
+    success: bool,
+    result: Option<Vec<String>>,
+    error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct CallBatchOutput {
+    calls: Vec<CallResult>,
+}
+
+/// Resolve RPC URL from chain_id, explicit rpc_url, or config
+fn resolve_rpc_url(
+    chain_id: Option<String>,
+    rpc_url: Option<String>,
+    config: &Config,
+) -> Result<String> {
+    // If explicit RPC URL provided, use it
+    if let Some(url) = rpc_url {
+        return Ok(url);
+    }
+
+    // If chain_id provided, map to known RPC URL
+    if let Some(chain) = chain_id {
+        match chain.as_str() {
+            "SN_MAIN" => Ok("https://api.cartridge.gg/x/starknet/mainnet".to_string()),
+            "SN_SEPOLIA" => Ok("https://api.cartridge.gg/x/starknet/sepolia".to_string()),
+            _ => Err(CliError::InvalidInput(format!(
+                "Unsupported chain ID '{}'. Supported chains: SN_MAIN, SN_SEPOLIA",
+                chain
+            ))),
+        }
+    } else {
+        // Fall back to config default
+        Ok(config.session.default_rpc_url.clone())
+    }
+}
