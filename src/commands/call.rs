@@ -2,7 +2,10 @@ use crate::config::Config;
 use crate::error::{CliError, Result};
 use crate::output::OutputFormatter;
 use serde::{Deserialize, Serialize};
-use starknet::core::types::{BlockId, BlockTag, Felt, FunctionCall};
+use starknet::core::{
+    types::{BlockId, BlockTag, Felt, FunctionCall},
+    utils::cairo_short_string_to_felt,
+};
 use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Provider};
 
 /// Execute a read-only call to a contract
@@ -90,11 +93,11 @@ async fn execute_single_call(
     let calldata: Vec<Felt> = call
         .calldata
         .iter()
-        .map(|s| {
-            Felt::from_hex(s)
-                .map_err(|e| CliError::InvalidInput(format!("Invalid calldata value '{s}': {e}")))
-        })
-        .collect::<Result<Vec<_>>>()?;
+        .map(|s| parse_calldata_value(s))
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .flatten()
+        .collect();
 
     let function_call = FunctionCall {
         contract_address,
@@ -131,6 +134,48 @@ fn parse_calldata(calldata: Option<String>) -> Result<Vec<String>> {
     match calldata {
         None => Ok(Vec::new()),
         Some(data) => Ok(data.split(',').map(|s| s.trim().to_string()).collect()),
+    }
+}
+
+/// Parse a calldata value, handling special prefixes (u256:, str:) and default felt parsing.
+fn parse_calldata_value(value: &str) -> Result<Vec<Felt>> {
+    if let Some(u256_str) = value.strip_prefix("u256:") {
+        // Parse u256 value and split into low/high felts
+        let normalized = if u256_str.starts_with("0X") {
+            u256_str.to_lowercase()
+        } else {
+            u256_str.to_string()
+        };
+
+        let felt = normalized
+            .parse::<Felt>()
+            .map_err(|e| CliError::InvalidInput(format!("Invalid u256 value '{value}': {e}")))?;
+
+        // Split into low and high 128-bit parts
+        let felt_bytes = felt.to_bytes_be();
+        let high_bytes = &felt_bytes[0..16];
+        let low_bytes = &felt_bytes[16..32];
+
+        let low = Felt::from_bytes_be_slice(low_bytes);
+        let high = Felt::from_bytes_be_slice(high_bytes);
+
+        Ok(vec![low, high])
+    } else if let Some(str_value) = value.strip_prefix("str:") {
+        // Parse Cairo short string
+        let felt = cairo_short_string_to_felt(str_value)
+            .map_err(|e| CliError::InvalidInput(format!("Invalid short string '{value}': {e}")))?;
+        Ok(vec![felt])
+    } else {
+        // Default: parse as felt
+        let normalized = if value.starts_with("0X") {
+            value.to_lowercase()
+        } else {
+            value.to_string()
+        };
+        let felt = normalized
+            .parse::<Felt>()
+            .map_err(|e| CliError::InvalidInput(format!("Invalid felt value '{value}': {e}")))?;
+        Ok(vec![felt])
     }
 }
 
