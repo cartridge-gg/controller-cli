@@ -40,6 +40,15 @@ pub enum CliError {
     #[error("API error: {0}")]
     ApiError(String),
 
+    #[error("Timeout: {0}")]
+    TimeoutError(String),
+
+    #[error("Not found: {0}")]
+    NotFoundError(String),
+
+    #[error("File error for {path}: {message}")]
+    FileError { path: String, message: String },
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -58,6 +67,9 @@ impl CliError {
             CliError::CallbackTimeout(_) => "CallbackTimeout",
             CliError::ServerError(_) => "ServerError",
             CliError::ApiError(_) => "ApiError",
+            CliError::TimeoutError(_) => "TimeoutError",
+            CliError::NotFoundError(_) => "NotFoundError",
+            CliError::FileError { .. } => "FileError",
             CliError::Other(_) => "UnknownError",
         }
     }

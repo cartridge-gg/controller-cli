@@ -116,6 +116,59 @@ enum Commands {
         #[arg(long)]
         addresses: Option<String>,
     },
+
+    /// Execute a read-only call to a contract
+    Call {
+        /// Contract address
+        #[arg(long)]
+        contract: Option<String>,
+
+        /// Entrypoint/function name
+        #[arg(long)]
+        entrypoint: Option<String>,
+
+        /// Calldata as comma-separated hex values
+        #[arg(long)]
+        calldata: Option<String>,
+
+        /// Read calls from JSON file
+        #[arg(long)]
+        file: Option<String>,
+
+        /// Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA') - auto-selects RPC URL
+        #[arg(long, conflicts_with = "rpc_url")]
+        chain_id: Option<String>,
+
+        /// RPC URL to use (overrides config)
+        #[arg(long, conflicts_with = "chain_id")]
+        rpc_url: Option<String>,
+
+        /// Block ID to query (latest, pending, block number, or block hash)
+        #[arg(long)]
+        block_id: Option<String>,
+    },
+
+    /// Get transaction status and details
+    Transaction {
+        /// Transaction hash
+        hash: String,
+
+        /// Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA') - auto-selects RPC URL
+        #[arg(long, conflicts_with = "rpc_url")]
+        chain_id: Option<String>,
+
+        /// RPC URL to use (overrides config)
+        #[arg(long, conflicts_with = "chain_id")]
+        rpc_url: Option<String>,
+
+        /// Wait for transaction to be confirmed
+        #[arg(long)]
+        wait: bool,
+
+        /// Timeout in seconds when waiting
+        #[arg(long, default_value = "300")]
+        timeout: u64,
+    },
 }
 
 #[tokio::main]
@@ -183,6 +236,46 @@ async fn main() {
             usernames,
             addresses,
         } => commands::lookup::execute(&config, &*formatter, usernames, addresses).await,
+        Commands::Call {
+            contract,
+            entrypoint,
+            calldata,
+            file,
+            chain_id,
+            rpc_url,
+            block_id,
+        } => {
+            commands::call::execute(
+                &config,
+                &*formatter,
+                contract,
+                entrypoint,
+                calldata,
+                file,
+                chain_id,
+                rpc_url,
+                block_id,
+            )
+            .await
+        }
+        Commands::Transaction {
+            hash,
+            chain_id,
+            rpc_url,
+            wait,
+            timeout,
+        } => {
+            commands::transaction::execute(
+                &config,
+                &*formatter,
+                hash,
+                chain_id,
+                rpc_url,
+                wait,
+                timeout,
+            )
+            .await
+        }
     };
 
     if let Err(e) = result {
