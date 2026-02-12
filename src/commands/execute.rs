@@ -68,7 +68,7 @@ pub async fn execute(
         }]
     } else {
         return Err(CliError::InvalidInput(
-            "Either --file or all of --contract, --entrypoint, --calldata must be provided"
+            "Either --file or all of contract, entrypoint, calldata arguments must be provided"
                 .to_string(),
         ));
     };

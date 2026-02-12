@@ -58,11 +58,10 @@ pub async fn execute(
     }
 
     // Handle single call
-    let contract = contract.ok_or_else(|| {
-        CliError::InvalidInput("Missing required argument: --contract".to_string())
-    })?;
+    let contract = contract
+        .ok_or_else(|| CliError::InvalidInput("Missing required argument: contract".to_string()))?;
     let entrypoint = entrypoint.ok_or_else(|| {
-        CliError::InvalidInput("Missing required argument: --entrypoint".to_string())
+        CliError::InvalidInput("Missing required argument: entrypoint".to_string())
     })?;
 
     let call = ContractCall {
