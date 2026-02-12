@@ -1,7 +1,8 @@
 ## Changes
 
-- feat: add lookup command for username/address resolution (#18)
-- feat: warn when a newer CLI version is available (#17)
-- feat: validate calls against session policies before execution (#16)
-- feat: add release-dispatch workflow for automated version bumps and releases (#15)
-- feat: improve llm usage doc (#14)
+- refactor: rename commands to shorter flat names (#27)
+- fix: error messages (#26)
+- refactor: use positional args for contract, entrypoint, calldata (#24)
+- feat: add warning when no network is specified (#25)
+- feat: add call and transaction commands (#23)
+- feat(register): auto-open authorization URL in browser (#22)
