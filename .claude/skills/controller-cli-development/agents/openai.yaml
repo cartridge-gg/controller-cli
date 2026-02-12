@@ -1,0 +1,4 @@
+interface:
+  display_name: "Controller CLI Development"
+  short_description: "Contributor workflow for cartridge-gg/controller-cli"
+  default_prompt: "Use $controller-cli-development to implement and validate changes in controller-cli."
