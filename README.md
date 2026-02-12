@@ -62,7 +62,7 @@ The CLI generates an authorization URL, displays it, then automatically polls un
 controller execute \
   0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
   transfer \
-  0xrecipient,0x100,0x0
+  0xrecipient,u256:1000000000000000000
 ```
 
 **Multiple calls from file:**
@@ -89,6 +89,19 @@ controller call \
 ```
 
 Use `--block-id` to query at a specific block (`latest`, `pending`, a block number, or block hash).
+
+### Calldata Formats
+
+Calldata values support multiple formats:
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| Hex | `0x64` | Standard hex felt |
+| Decimal | `100` | Decimal felt |
+| `u256:` | `u256:1000000000000000000` | Auto-splits into low/high 128-bit felts |
+| `str:` | `str:hello` | Cairo short string |
+
+The `u256:` prefix eliminates the need to manually split token amounts into low/high parts.
 
 ### 5. Get Transaction Status
 
