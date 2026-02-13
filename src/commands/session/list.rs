@@ -90,7 +90,7 @@ pub async fn execute(
         })
         .collect();
 
-    let total_pages = (result.total_count as u32 + limit - 1) / limit;
+    let total_pages = (result.total_count as u32).div_ceil(limit);
     let has_next = page < total_pages;
 
     let output = ListOutput {
@@ -112,7 +112,7 @@ pub async fn execute(
             formatter.info("No sessions found.");
         } else {
             println!();
-            println!("  {:<68} {:<24} {}", "SESSION ID", "APP", "EXPIRES");
+            println!("  {:<68} {:<24} EXPIRES", "SESSION ID", "APP");
             println!("  {}", "-".repeat(104));
 
             for s in &output.sessions {
