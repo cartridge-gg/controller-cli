@@ -157,8 +157,20 @@ enum SessionCommands {
     /// Display current session status and information
     Status,
 
-    /// List all sessions
-    List,
+    /// List sessions
+    List {
+        /// Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA') - defaults to session chain
+        #[arg(long)]
+        chain_id: Option<String>,
+
+        /// Number of sessions per page
+        #[arg(long, default_value = "10")]
+        limit: u32,
+
+        /// Page number (starting from 1)
+        #[arg(long, default_value = "1")]
+        page: u32,
+    },
 
     /// Revoke an active session (onchain)
     Revoke,
@@ -213,7 +225,13 @@ async fn main() {
                 .await
             }
             SessionCommands::Status => commands::status::execute(&config, &*formatter).await,
-            SessionCommands::List => commands::session::list::execute(&config, &*formatter).await,
+            SessionCommands::List {
+                chain_id,
+                limit,
+                page,
+            } => {
+                commands::session::list::execute(&config, &*formatter, chain_id, limit, page).await
+            }
             SessionCommands::Revoke => {
                 commands::session::revoke::execute(&config, &*formatter).await
             }
