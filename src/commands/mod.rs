@@ -5,5 +5,5 @@ pub mod execute;
 pub mod lookup;
 pub mod session;
 pub mod status;
-pub mod store;
+
 pub mod transaction;

@@ -29,27 +29,10 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Manage session lifecycle (authorize, status, list, revoke)
+    /// Manage session lifecycle
     Session {
         #[command(subcommand)]
         command: SessionCommands,
-    },
-
-    /// Manually store session credentials from authorization
-    Store {
-        /// Base64-encoded session data
-        session_data: Option<String>,
-
-        /// Read session data from file
-        #[arg(long)]
-        from_file: Option<String>,
-    },
-
-    /// Clear all stored session data
-    Clear {
-        /// Skip confirmation prompt
-        #[arg(long)]
-        yes: bool,
     },
 
     /// Execute a transaction using the active session
@@ -82,17 +65,6 @@ enum Commands {
         /// Force self-pay (don't use paymaster)
         #[arg(long)]
         no_paymaster: bool,
-    },
-
-    /// Look up controller addresses by usernames or usernames by addresses
-    Lookup {
-        /// Comma-separated usernames to resolve (e.g., 'shinobi,sensei')
-        #[arg(long)]
-        usernames: Option<String>,
-
-        /// Comma-separated addresses to resolve (e.g., '0x123...,0x456...')
-        #[arg(long)]
-        addresses: Option<String>,
     },
 
     /// Execute a read-only call to a contract
@@ -144,6 +116,17 @@ enum Commands {
         #[arg(long, default_value = "300")]
         timeout: u64,
     },
+
+    /// Look up controller addresses by usernames or usernames by addresses
+    Lookup {
+        /// Comma-separated usernames to resolve (e.g., 'shinobi,sensei')
+        #[arg(long)]
+        usernames: Option<String>,
+
+        /// Comma-separated addresses to resolve (e.g., '0x123...,0x456...')
+        #[arg(long)]
+        addresses: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -179,6 +162,13 @@ enum SessionCommands {
 
     /// Revoke an active session
     Revoke,
+
+    /// Clear all stored session data
+    Clear {
+        /// Skip confirmation prompt
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[tokio::main]
@@ -227,12 +217,10 @@ async fn main() {
             SessionCommands::Revoke => {
                 commands::session::revoke::execute(&config, &*formatter).await
             }
+            SessionCommands::Clear { yes } => {
+                commands::clear::execute(&config, &*formatter, yes).await
+            }
         },
-        Commands::Store {
-            session_data,
-            from_file,
-        } => commands::store::execute(&config, &*formatter, session_data, from_file).await,
-        Commands::Clear { yes } => commands::clear::execute(&config, &*formatter, yes).await,
         Commands::Execute {
             contract,
             entrypoint,
