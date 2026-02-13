@@ -2,9 +2,8 @@ pub mod call;
 pub mod calldata;
 pub mod clear;
 pub mod execute;
-pub mod generate;
 pub mod lookup;
-pub mod register;
+pub mod session;
 pub mod status;
-pub mod store;
+
 pub mod transaction;

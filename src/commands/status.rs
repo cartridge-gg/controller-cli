@@ -12,13 +12,13 @@ use std::path::PathBuf;
 
 #[derive(Serialize)]
 pub struct StatusOutput {
-    pub status: String,
     pub session: Option<SessionInfo>,
-    pub keypair: Option<KeypairInfo>,
 }
 
 #[derive(Serialize)]
 pub struct SessionInfo {
+    pub guid: String,
+    pub public_key: String,
     pub address: String,
     pub chain_id: String,
     pub expires_at: u64,
@@ -26,57 +26,28 @@ pub struct SessionInfo {
     pub expires_at_formatted: String,
     pub is_expired: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub policies: Option<PolicyInfo>,
+    pub policies: Option<Vec<String>>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct PolicyInfo {
-    pub contracts: std::collections::HashMap<String, ContractPolicy>,
+/// Raw stored format (for deserialization only)
+#[derive(Deserialize)]
+struct StoredPolicyInfo {
+    contracts: std::collections::HashMap<String, StoredContractPolicy>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct ContractPolicy {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    pub methods: Vec<MethodPolicy>,
+#[derive(Deserialize)]
+struct StoredContractPolicy {
+    methods: Vec<StoredMethodPolicy>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct MethodPolicy {
-    pub name: String,
-    pub entrypoint: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    pub authorized: bool,
-}
-
-#[derive(Serialize)]
-pub struct KeypairInfo {
-    pub public_key: String,
-    pub has_private_key: bool,
+#[derive(Deserialize)]
+struct StoredMethodPolicy {
+    entrypoint: String,
 }
 
 pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result<()> {
     let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
     let backend = FileSystemBackend::new(storage_path.clone());
-
-    // Check for stored keypair
-    let keypair_info = match backend.get("session_signer") {
-        Ok(Some(StorageValue::String(data))) => {
-            let credentials: Credentials = serde_json::from_str(&data)
-                .map_err(|e| CliError::InvalidSessionData(e.to_string()))?;
-
-            let signing_key =
-                starknet::signers::SigningKey::from_secret_scalar(credentials.private_key);
-            let verifying_key = signing_key.verifying_key();
-
-            Some(KeypairInfo {
-                public_key: format!("0x{:x}", verifying_key.scalar()),
-                has_private_key: true,
-            })
-        }
-        _ => None,
-    };
 
     // Check for stored session and controller metadata
     // First get controller metadata to construct the proper session key
@@ -108,28 +79,75 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
                     starknet::core::utils::parse_cairo_short_string(&controller.chain_id)
                         .unwrap_or_else(|_| format!("0x{:x}", controller.chain_id));
 
-                // Try to load stored policies
-                let policies =
+                // Try to load stored policies as flat "address:entrypoint" list
+                let policies = backend
+                    .get("session_policies")
+                    .ok()
+                    .flatten()
+                    .and_then(|v| match v {
+                        StorageValue::String(data) => {
+                            serde_json::from_str::<StoredPolicyInfo>(&data).ok()
+                        }
+                        _ => None,
+                    })
+                    .map(|info| {
+                        let mut entries: Vec<String> = info
+                            .contracts
+                            .iter()
+                            .flat_map(|(addr, contract)| {
+                                contract
+                                    .methods
+                                    .iter()
+                                    .map(move |m| format!("{addr}:{}", m.entrypoint))
+                            })
+                            .collect();
+                        entries.sort();
+                        entries
+                    });
+
+                let session_key_guid =
                     backend
-                        .get("session_policies")
+                        .get("session_key_guid")
                         .ok()
                         .flatten()
                         .and_then(|v| match v {
-                            StorageValue::String(data) => {
-                                serde_json::from_str::<PolicyInfo>(&data).ok()
-                            }
+                            StorageValue::String(s) => Some(s),
                             _ => None,
                         });
 
-                Some(SessionInfo {
-                    address,
-                    chain_id,
-                    expires_at,
-                    expires_in_seconds: expires_in,
-                    expires_at_formatted: expires_at_dt.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
-                    is_expired,
-                    policies,
-                })
+                match session_key_guid {
+                    Some(guid) => {
+                        let public_key = match backend.get("session_signer") {
+                            Ok(Some(StorageValue::String(data))) => {
+                                let credentials: Credentials = serde_json::from_str(&data)
+                                    .map_err(|e| CliError::InvalidSessionData(e.to_string()))?;
+                                let signing_key = starknet::signers::SigningKey::from_secret_scalar(
+                                    credentials.private_key,
+                                );
+                                format!("0x{:x}", signing_key.verifying_key().scalar())
+                            }
+                            _ => String::new(),
+                        };
+
+                        Some(SessionInfo {
+                            guid,
+                            public_key,
+                            address,
+                            chain_id,
+                            expires_at,
+                            expires_in_seconds: expires_in,
+                            expires_at_formatted: expires_at_dt
+                                .format("%Y-%m-%d %H:%M:%S UTC")
+                                .to_string(),
+                            is_expired,
+                            policies,
+                        })
+                    }
+                    None => {
+                        formatter.warning("Session data is outdated. Run 'controller session auth' to create a new session.");
+                        None
+                    }
+                }
             }
             _ => None,
         }
@@ -137,33 +155,14 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
         None
     };
 
-    let status = if session_info.is_some() && !session_info.as_ref().unwrap().is_expired {
-        "active"
-    } else if keypair_info.is_some() {
-        "keypair_only"
-    } else {
-        "no_session"
-    };
-
     let output = StatusOutput {
-        status: status.to_string(),
         session: session_info,
-        keypair: keypair_info,
     };
 
     formatter.success(&output);
 
-    if status == "no_session" {
-        formatter.info("No session found. Run 'controller generate' to get started.");
-    } else if status == "keypair_only" {
-        formatter.info(
-            "Keypair found but no active session. Run 'controller register' to create a session.",
-        );
-    } else if let Some(session) = &output.session {
-        if session.is_expired {
-            formatter
-                .warning("Session has expired. Run 'controller register' to create a new session.");
-        }
+    if output.session.is_none() {
+        formatter.info("No session found. Run 'controller session auth' to get started.");
     }
 
     Ok(())

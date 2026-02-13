@@ -2,10 +2,10 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum CliError {
-    #[error("Session not found. Run 'controller generate' and 'controller register' first")]
+    #[error("No active session. Run 'controller session auth' to create one")]
     NoSession,
 
-    #[error("Session expired at {0}. Run 'controller register' to create a new session")]
+    #[error("Session expired at {0}. Run 'controller session auth' to create a new session")]
     SessionExpired(String),
 
     #[error("Policy violation: {message}")]
@@ -74,16 +74,17 @@ impl CliError {
 
     pub fn recovery_hint(&self) -> Option<&'static str> {
         match self {
-            CliError::NoSession => Some(
-                "Run 'controller generate' followed by 'controller register' to set up a session",
-            ),
+            CliError::NoSession => Some("Run 'controller session auth' to create a session"),
             CliError::SessionExpired(_) => {
-                Some("Run 'controller register' to create a new session")
+                Some("Run 'controller session auth' to create a new session")
+            }
+            CliError::InvalidSessionData(_) => {
+                Some("Run 'controller session auth' to create a new session")
             }
             CliError::PolicyViolation { .. } => {
-                Some("Review your session policies or register a new session with updated policies")
+                Some("Run 'controller session auth' with updated policies")
             }
-            CliError::CallbackTimeout(_) => Some("Try running register again"),
+            CliError::CallbackTimeout(_) => Some("Run 'controller session auth' to try again"),
             _ => None,
         }
     }

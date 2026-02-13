@@ -1,5 +1,5 @@
 use crate::{
-    commands::{calldata::parse_calldata_value, register::PolicyStorage},
+    commands::{calldata::parse_calldata_value, session::authorize::PolicyStorage},
     config::Config,
     error::{CliError, Result},
     output::OutputFormatter,
@@ -82,7 +82,12 @@ pub async fn execute(
     let controller_metadata = backend
         .controller()
         .map_err(|e| CliError::Storage(e.to_string()))?
-        .ok_or_else(|| CliError::InvalidSessionData("No controller metadata found".to_string()))?;
+        .ok_or_else(|| {
+            CliError::InvalidSessionData(
+                "No controller metadata found. Run 'controller session auth' to create a session."
+                    .to_string(),
+            )
+        })?;
 
     // Construct the session key using the same format as Controller
     let session_key = format!(
@@ -376,7 +381,7 @@ fn validate_calls_against_policies(calls: &[CallSpec], policies: &PolicyStorage)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::register::{ContractPolicy, MethodPolicy, PolicyStorage};
+    use crate::commands::session::authorize::{ContractPolicy, MethodPolicy, PolicyStorage};
     use std::collections::HashMap;
 
     fn make_policies(contracts: Vec<(&str, Vec<&str>)>) -> PolicyStorage {

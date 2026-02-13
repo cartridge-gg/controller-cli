@@ -9,6 +9,7 @@ use account_sdk::storage::{
     filestorage::FileSystemBackend, Credentials, StorageBackend, StorageValue,
 };
 use serde::{Deserialize, Serialize};
+use starknet::signers::SigningKey;
 use std::{fmt::Display, path::PathBuf};
 use url::Url;
 
@@ -49,7 +50,7 @@ fn default_authorized() -> bool {
 }
 
 #[derive(Serialize)]
-pub struct RegisterOutput {
+pub struct AuthorizeOutput {
     pub authorization_url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub short_url: Option<String>,
@@ -88,12 +89,41 @@ pub async fn execute(
     file: Option<String>,
     chain_id: Option<String>,
     rpc_url: Option<String>,
+    overwrite: bool,
 ) -> Result<()> {
     // Validate that either preset or file is provided
     if preset.is_none() && file.is_none() {
         return Err(CliError::InvalidInput(
             "Session policies are required. Use --preset <name> to load a preset policy or --file <path> to provide a local policy JSON file".to_string(),
         ));
+    }
+
+    // Check if there's an active unexpired session before proceeding
+    let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
+    let backend = FileSystemBackend::new(storage_path.clone());
+
+    let controller_metadata = backend.controller().ok().flatten();
+    if let Some(controller) = &controller_metadata {
+        let session_key = format!(
+            "@cartridge/session/0x{:x}/0x{:x}",
+            controller.address, controller.chain_id
+        );
+        if let Ok(Some(metadata)) = backend.session(&session_key) {
+            if !metadata.session.is_expired() && !overwrite {
+                formatter.warning(
+                    "An active session already exists. Authorizing a new session will replace it.",
+                );
+                eprint!("Continue? [y/N] ");
+                let mut input = String::new();
+                std::io::stdin()
+                    .read_line(&mut input)
+                    .map_err(|e| CliError::InvalidInput(format!("Failed to read input: {e}")))?;
+                if !matches!(input.trim().to_lowercase().as_str(), "y" | "yes") {
+                    formatter.info("Aborted.");
+                    return Ok(());
+                }
+            }
+        }
     }
 
     // Map chain_id to RPC URL if provided
@@ -115,34 +145,35 @@ pub async fn execute(
         Some("https://api.cartridge.gg/x/starknet/sepolia".to_string())
     };
 
-    // Load the stored keypair
-    let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
-    let mut backend = FileSystemBackend::new(storage_path);
+    // Generate a new session keypair
+    let signing_key = SigningKey::from_random();
+    let verifying_key = signing_key.verifying_key();
+    let public_key = format!("0x{:x}", verifying_key.scalar());
+    let private_key = signing_key.secret_scalar();
 
-    let public_key = match backend.get("session_signer") {
-        Ok(Some(StorageValue::String(data))) => {
-            let credentials: Credentials = serde_json::from_str(&data)
-                .map_err(|e| CliError::InvalidSessionData(e.to_string()))?;
+    // Re-open storage as mutable for writes
+    let mut backend = FileSystemBackend::new(storage_path.clone());
 
-            let signing_key =
-                starknet::signers::SigningKey::from_secret_scalar(credentials.private_key);
-            let verifying_key = signing_key.verifying_key();
-            format!("0x{:x}", verifying_key.scalar())
-        }
-        _ => {
-            return Err(CliError::NoSession);
-        }
+    // Store the keypair as session credentials
+    let credentials = Credentials {
+        private_key,
+        authorization: vec![],
     };
+
+    let credentials_json =
+        serde_json::to_string(&credentials).map_err(|e| CliError::InvalidInput(e.to_string()))?;
+
+    backend
+        .set("session_signer", &StorageValue::String(credentials_json))
+        .map_err(|e| CliError::Storage(e.to_string()))?;
 
     // Load policies from preset or file
     let policy_file: PolicyFile = if let Some(preset_name) = preset {
         // Fetch preset from GitHub
-        formatter.info(&format!("Fetching preset '{preset_name}'..."));
         let preset_config = presets::fetch_preset(&preset_name).await?;
 
         // If resolved_rpc_url is provided, extract chain-specific policies
         if let Some(ref rpc_url_str) = resolved_rpc_url {
-            formatter.info("Determining chain from RPC URL...");
             let provider = starknet::providers::jsonrpc::JsonRpcClient::new(
                 starknet::providers::jsonrpc::HttpTransport::new(
                     url::Url::parse(rpc_url_str)
@@ -158,8 +189,6 @@ pub async fn execute(
 
             let chain_name = starknet::core::utils::parse_cairo_short_string(&chain_id)
                 .unwrap_or_else(|_| format!("0x{chain_id:x}"));
-
-            formatter.info(&format!("Using policies for chain: {chain_name}"));
 
             // Extract chain-specific policies
             let chain_policies =
@@ -190,14 +219,6 @@ pub async fn execute(
                 })
                 .collect();
 
-            // Display summary of what will be authorized
-            let total_entrypoints: usize = contracts.values().map(|c| c.methods.len()).sum();
-            formatter.info(&format!(
-                "Preset loaded: {} contracts, {} entrypoints",
-                contracts.len(),
-                total_entrypoints
-            ));
-
             PolicyFile {
                 contracts,
                 messages: chain_policies.messages,
@@ -218,6 +239,16 @@ pub async fn execute(
     } else {
         unreachable!("Either preset or file must be provided");
     };
+
+    let total_contracts = policy_file.contracts.len();
+    let total_entrypoints: usize = policy_file
+        .contracts
+        .values()
+        .map(|c| c.methods.len())
+        .sum();
+    formatter.info(&format!(
+        "Policies loaded: {total_contracts} contracts, {total_entrypoints} entrypoints"
+    ));
 
     // Convert to the format expected by the keychain
     let mut policies = serde_json::json!({
@@ -290,32 +321,6 @@ pub async fn execute(
         .map_err(|e| CliError::InvalidInput(format!("Failed to serialize policies: {e}")))?;
     let parsed_policies = policy_vec;
 
-    // Check if there's an active unexpired session for the same keypair
-    let controller_metadata = backend.controller().ok().flatten();
-    if let Some(controller) = &controller_metadata {
-        let session_key = format!(
-            "@cartridge/session/0x{:x}/0x{:x}",
-            controller.address, controller.chain_id
-        );
-        if let Ok(Some(metadata)) = backend.session(&session_key) {
-            if !metadata.session.is_expired()
-                && metadata.session.inner.session_key_guid == {
-                    use starknet::macros::short_string;
-                    use starknet_crypto::poseidon_hash;
-
-                    let pubkey_felt =
-                        starknet::core::types::Felt::from_hex(&public_key).unwrap_or_default();
-                    poseidon_hash(short_string!("Starknet Signer"), pubkey_felt)
-                }
-            {
-                formatter.warning("Active session exists for this keypair. A session keypair can only be registered once.");
-                formatter
-                    .info("Run 'controller generate' to create a new keypair, then re-register.");
-                return Ok(());
-            }
-        }
-    }
-
     // Use CLI flag if provided, otherwise use config
     let effective_rpc_url = resolved_rpc_url
         .as_ref()
@@ -331,7 +336,6 @@ pub async fn execute(
     }
 
     // Query chain_id from the RPC endpoint to display in authorization URL
-    formatter.info("Validating RPC endpoint...");
     let provider = starknet::providers::jsonrpc::JsonRpcClient::new(
         starknet::providers::jsonrpc::HttpTransport::new(
             url::Url::parse(effective_rpc_url)
@@ -353,8 +357,6 @@ pub async fn execute(
                     "RPC endpoint not responding: {e}"
                 )));
             }
-            // If using default RPC from config, just log warning and continue
-            formatter.info(&format!("Warning: Could not query chain from RPC: {e}"));
             None
         }
     };
@@ -381,7 +383,7 @@ pub async fn execute(
     let display_url = short_url.as_deref().unwrap_or(&authorization_url);
     try_open_authorization_url(formatter, display_url);
 
-    let output = RegisterOutput {
+    let output = AuthorizeOutput {
         authorization_url: authorization_url.clone(),
         short_url: short_url.clone(),
         public_key: public_key.clone(),
@@ -399,7 +401,7 @@ pub async fn execute(
             formatter.info("Authorization URL:");
         }
         println!("\n{display_url}\n");
-        formatter.info("Waiting for authorization (timeout: 5 minutes)...");
+        formatter.info("Waiting for authorization...");
     }
 
     // Calculate session_key_guid for long-polling query
@@ -455,15 +457,21 @@ pub async fn execute(
                 backend
                     .set("session_policies", &StorageValue::String(policies_json))
                     .map_err(|e| CliError::Storage(e.to_string()))?;
+                backend
+                    .set(
+                        "session_key_guid",
+                        &StorageValue::String(session_key_guid.clone()),
+                    )
+                    .map_err(|e| CliError::Storage(e.to_string()))?;
 
                 if config.cli.json_output {
                     formatter.success(&serde_json::json!({
-                        "message": "Session registered and stored successfully",
+                        "message": "Session authorized and stored successfully",
                         "public_key": public_key,
                         "chain_id": chain_id,
                     }));
                 } else {
-                    formatter.info("Session registered and stored successfully.");
+                    formatter.info("Session authorized and stored successfully.");
                 }
 
                 return Ok(());

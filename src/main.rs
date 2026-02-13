@@ -29,46 +29,10 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Generate and store a new session keypair
-    Generate,
-
-    /// Generate authorization URL for session registration
-    Register {
-        /// Preset name (e.g., 'loot-survivor')
-        #[arg(long, conflicts_with = "file")]
-        preset: Option<String>,
-
-        /// Path to local policy file (JSON)
-        #[arg(long, conflicts_with = "preset")]
-        file: Option<String>,
-
-        /// Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA') - auto-selects RPC URL
-        #[arg(long, conflicts_with = "rpc_url")]
-        chain_id: Option<String>,
-
-        /// RPC URL to use (overrides config)
-        #[arg(long, conflicts_with = "chain_id")]
-        rpc_url: Option<String>,
-    },
-
-    /// Manually store session credentials from authorization
-    Store {
-        /// Base64-encoded session data
-        session_data: Option<String>,
-
-        /// Read session data from file
-        #[arg(long)]
-        from_file: Option<String>,
-    },
-
-    /// Display current session status and information
-    Status,
-
-    /// Clear all stored session data
-    Clear {
-        /// Skip confirmation prompt
-        #[arg(long)]
-        yes: bool,
+    /// Manage session lifecycle
+    Session {
+        #[command(subcommand)]
+        command: SessionCommands,
     },
 
     /// Execute a transaction using the active session
@@ -101,17 +65,6 @@ enum Commands {
         /// Force self-pay (don't use paymaster)
         #[arg(long)]
         no_paymaster: bool,
-    },
-
-    /// Look up controller addresses by usernames or usernames by addresses
-    Lookup {
-        /// Comma-separated usernames to resolve (e.g., 'shinobi,sensei')
-        #[arg(long)]
-        usernames: Option<String>,
-
-        /// Comma-separated addresses to resolve (e.g., '0x123...,0x456...')
-        #[arg(long)]
-        addresses: Option<String>,
     },
 
     /// Execute a read-only call to a contract
@@ -163,6 +116,59 @@ enum Commands {
         #[arg(long, default_value = "300")]
         timeout: u64,
     },
+
+    /// Look up controller addresses by usernames or usernames by addresses
+    Lookup {
+        /// Comma-separated usernames to resolve (e.g., 'shinobi,sensei')
+        #[arg(long)]
+        usernames: Option<String>,
+
+        /// Comma-separated addresses to resolve (e.g., '0x123...,0x456...')
+        #[arg(long)]
+        addresses: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum SessionCommands {
+    /// Generate keypair and authorize a new session
+    Auth {
+        /// Preset name (e.g., 'loot-survivor')
+        #[arg(long, conflicts_with = "file")]
+        preset: Option<String>,
+
+        /// Path to local policy file (JSON)
+        #[arg(long, conflicts_with = "preset")]
+        file: Option<String>,
+
+        /// Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA') - auto-selects RPC URL
+        #[arg(long, conflicts_with = "rpc_url")]
+        chain_id: Option<String>,
+
+        /// RPC URL to use (overrides config)
+        #[arg(long, conflicts_with = "chain_id")]
+        rpc_url: Option<String>,
+
+        /// Overwrite existing session without confirmation
+        #[arg(long)]
+        overwrite: bool,
+    },
+
+    /// Display current session status and information
+    Status,
+
+    /// List all sessions
+    List,
+
+    /// Revoke an active session (onchain)
+    Revoke,
+
+    /// Clear all stored session data
+    Clear {
+        /// Skip confirmation prompt
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[tokio::main]
@@ -187,21 +193,34 @@ async fn main() {
     let update_check = tokio::spawn(version::check_for_update());
 
     let result = match cli.command {
-        Commands::Generate => commands::generate::execute(&config, &*formatter).await,
-        Commands::Register {
-            preset,
-            file,
-            chain_id,
-            rpc_url,
-        } => {
-            commands::register::execute(&config, &*formatter, preset, file, chain_id, rpc_url).await
-        }
-        Commands::Store {
-            session_data,
-            from_file,
-        } => commands::store::execute(&config, &*formatter, session_data, from_file).await,
-        Commands::Status => commands::status::execute(&config, &*formatter).await,
-        Commands::Clear { yes } => commands::clear::execute(&config, &*formatter, yes).await,
+        Commands::Session { command } => match command {
+            SessionCommands::Auth {
+                preset,
+                file,
+                chain_id,
+                rpc_url,
+                overwrite,
+            } => {
+                commands::session::authorize::execute(
+                    &config,
+                    &*formatter,
+                    preset,
+                    file,
+                    chain_id,
+                    rpc_url,
+                    overwrite,
+                )
+                .await
+            }
+            SessionCommands::Status => commands::status::execute(&config, &*formatter).await,
+            SessionCommands::List => commands::session::list::execute(&config, &*formatter).await,
+            SessionCommands::Revoke => {
+                commands::session::revoke::execute(&config, &*formatter).await
+            }
+            SessionCommands::Clear { yes } => {
+                commands::clear::execute(&config, &*formatter, yes).await
+            }
+        },
         Commands::Execute {
             contract,
             entrypoint,
