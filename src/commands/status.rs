@@ -26,28 +26,23 @@ pub struct SessionInfo {
     pub expires_at_formatted: String,
     pub is_expired: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub policies: Option<PolicyInfo>,
+    pub policies: Option<Vec<String>>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct PolicyInfo {
-    pub contracts: std::collections::HashMap<String, ContractPolicy>,
+/// Raw stored format (for deserialization only)
+#[derive(Deserialize)]
+struct StoredPolicyInfo {
+    contracts: std::collections::HashMap<String, StoredContractPolicy>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct ContractPolicy {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    pub methods: Vec<MethodPolicy>,
+#[derive(Deserialize)]
+struct StoredContractPolicy {
+    methods: Vec<StoredMethodPolicy>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct MethodPolicy {
-    pub name: String,
-    pub entrypoint: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    pub authorized: bool,
+#[derive(Deserialize)]
+struct StoredMethodPolicy {
+    entrypoint: String,
 }
 
 #[derive(Serialize)]
@@ -108,18 +103,31 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
                     starknet::core::utils::parse_cairo_short_string(&controller.chain_id)
                         .unwrap_or_else(|_| format!("0x{:x}", controller.chain_id));
 
-                // Try to load stored policies
-                let policies =
-                    backend
-                        .get("session_policies")
-                        .ok()
-                        .flatten()
-                        .and_then(|v| match v {
-                            StorageValue::String(data) => {
-                                serde_json::from_str::<PolicyInfo>(&data).ok()
-                            }
-                            _ => None,
-                        });
+                // Try to load stored policies as flat "address:entrypoint" list
+                let policies = backend
+                    .get("session_policies")
+                    .ok()
+                    .flatten()
+                    .and_then(|v| match v {
+                        StorageValue::String(data) => {
+                            serde_json::from_str::<StoredPolicyInfo>(&data).ok()
+                        }
+                        _ => None,
+                    })
+                    .map(|info| {
+                        let mut entries: Vec<String> = info
+                            .contracts
+                            .iter()
+                            .flat_map(|(addr, contract)| {
+                                contract
+                                    .methods
+                                    .iter()
+                                    .map(move |m| format!("{addr}:{}", m.entrypoint))
+                            })
+                            .collect();
+                        entries.sort();
+                        entries
+                    });
 
                 Some(SessionInfo {
                     address,
@@ -154,15 +162,16 @@ pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result
     formatter.success(&output);
 
     if status == "no_session" {
-        formatter.info("No session found. Run 'controller generate' to get started.");
+        formatter.info("No session found. Run 'controller session auth' to get started.");
     } else if status == "keypair_only" {
         formatter.info(
-            "Keypair found but no active session. Run 'controller register' to create a session.",
+            "Keypair found but no active session. Run 'controller session auth' to create a session.",
         );
     } else if let Some(session) = &output.session {
         if session.is_expired {
-            formatter
-                .warning("Session has expired. Run 'controller register' to create a new session.");
+            formatter.warning(
+                "Session has expired. Run 'controller session auth' to create a new session.",
+            );
         }
     }
 
