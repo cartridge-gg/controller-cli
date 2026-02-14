@@ -9,3 +9,4 @@ pub mod receipt;
 pub mod session;
 pub mod status;
 pub mod transaction;
+pub mod username;
