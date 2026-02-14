@@ -13,8 +13,6 @@ pub struct Config {
 pub struct SessionConfig {
     #[serde(default = "default_storage_path")]
     pub storage_path: String,
-    #[serde(default = "default_chain_id")]
-    pub default_chain_id: String,
     #[serde(default = "default_rpc_url")]
     pub default_rpc_url: String,
     #[serde(default = "default_keychain_url")]
@@ -37,10 +35,6 @@ fn default_storage_path() -> String {
     dirs::config_dir()
         .map(|p| p.join("controller-cli").to_string_lossy().to_string())
         .unwrap_or_else(|| "~/.config/controller-cli".to_string())
-}
-
-fn default_chain_id() -> String {
-    "SN_SEPOLIA".to_string()
 }
 
 fn default_rpc_url() -> String {
@@ -67,7 +61,6 @@ impl Default for SessionConfig {
     fn default() -> Self {
         Self {
             storage_path: default_storage_path(),
-            default_chain_id: default_chain_id(),
             default_rpc_url: default_rpc_url(),
             keychain_url: default_keychain_url(),
             api_url: default_api_url(),
@@ -104,12 +97,78 @@ impl Config {
         Ok(config_dir.join("controller-cli").join("config.toml"))
     }
 
+    pub const VALID_KEYS: &'static [&'static str] = &[
+        "rpc-url",
+        "keychain-url",
+        "api-url",
+        "storage-path",
+        "json-output",
+        "colors",
+        "callback-timeout",
+    ];
+
+    pub fn save(&self) -> anyhow::Result<()> {
+        let config_path = Self::config_path()?;
+        if let Some(parent) = config_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let contents = toml::to_string_pretty(self)?;
+        std::fs::write(&config_path, contents)?;
+        Ok(())
+    }
+
+    pub fn get_by_alias(&self, alias: &str) -> anyhow::Result<String> {
+        match alias {
+            "rpc-url" => Ok(self.session.default_rpc_url.clone()),
+            "keychain-url" => Ok(self.session.keychain_url.clone()),
+            "api-url" => Ok(self.session.api_url.clone()),
+            "storage-path" => Ok(self.session.storage_path.clone()),
+            "json-output" => Ok(self.cli.json_output.to_string()),
+            "colors" => Ok(self.cli.use_colors.to_string()),
+            "callback-timeout" => Ok(self.cli.callback_timeout_seconds.to_string()),
+            _ => anyhow::bail!(
+                "Unknown config key '{}'. Valid keys: {}",
+                alias,
+                Self::VALID_KEYS.join(", ")
+            ),
+        }
+    }
+
+    pub fn set_by_alias(&mut self, alias: &str, value: &str) -> anyhow::Result<()> {
+        match alias {
+            "rpc-url" => self.session.default_rpc_url = value.to_string(),
+            "keychain-url" => self.session.keychain_url = value.to_string(),
+            "api-url" => self.session.api_url = value.to_string(),
+            "storage-path" => self.session.storage_path = value.to_string(),
+            "json-output" => {
+                self.cli.json_output = value.parse::<bool>().map_err(|_| {
+                    anyhow::anyhow!("Invalid value for json-output: expected 'true' or 'false'")
+                })?;
+            }
+            "colors" => {
+                self.cli.use_colors = value.parse::<bool>().map_err(|_| {
+                    anyhow::anyhow!("Invalid value for colors: expected 'true' or 'false'")
+                })?;
+            }
+            "callback-timeout" => {
+                self.cli.callback_timeout_seconds = value.parse::<u64>().map_err(|_| {
+                    anyhow::anyhow!(
+                        "Invalid value for callback-timeout: expected a positive integer"
+                    )
+                })?;
+            }
+            _ => anyhow::bail!(
+                "Unknown config key '{}'. Valid keys: {}",
+                alias,
+                Self::VALID_KEYS.join(", ")
+            ),
+        }
+        Ok(())
+    }
+
     pub fn merge_from_env(&mut self) {
         if let Ok(path) = std::env::var("CARTRIDGE_STORAGE_PATH") {
             self.session.storage_path = path;
-        }
-        if let Ok(chain_id) = std::env::var("CARTRIDGE_CHAIN_ID") {
-            self.session.default_chain_id = chain_id;
         }
         if let Ok(rpc_url) = std::env::var("CARTRIDGE_RPC_URL") {
             self.session.default_rpc_url = rpc_url;

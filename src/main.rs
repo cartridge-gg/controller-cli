@@ -117,6 +117,12 @@ enum Commands {
         timeout: u64,
     },
 
+    /// Manage CLI configuration
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommands,
+    },
+
     /// Look up controller addresses by usernames or usernames by addresses
     Lookup {
         /// Comma-separated usernames to resolve (e.g., 'shinobi,sensei')
@@ -127,6 +133,24 @@ enum Commands {
         #[arg(long)]
         addresses: Option<String>,
     },
+}
+
+#[derive(Subcommand)]
+enum ConfigCommands {
+    /// Set a configuration value
+    Set {
+        /// Config key (e.g., chain-id, rpc-url)
+        key: String,
+        /// Value to set
+        value: String,
+    },
+    /// Get a configuration value
+    Get {
+        /// Config key (e.g., chain-id, rpc-url)
+        key: String,
+    },
+    /// List all configuration values
+    List,
 }
 
 #[derive(Subcommand)]
@@ -237,6 +261,17 @@ async fn main() {
             }
             SessionCommands::Clear { yes } => {
                 commands::clear::execute(&config, &*formatter, yes).await
+            }
+        },
+        Commands::Config { command } => match command {
+            ConfigCommands::Set { key, value } => {
+                commands::config_cmd::execute_set(&*formatter, key, value).await
+            }
+            ConfigCommands::Get { key } => {
+                commands::config_cmd::execute_get(&*formatter, config.cli.json_output, key).await
+            }
+            ConfigCommands::List => {
+                commands::config_cmd::execute_list(&*formatter, config.cli.json_output).await
             }
         },
         Commands::Execute {

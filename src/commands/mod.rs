@@ -1,9 +1,9 @@
 pub mod call;
 pub mod calldata;
 pub mod clear;
+pub mod config_cmd;
 pub mod execute;
 pub mod lookup;
 pub mod session;
 pub mod status;
-
 pub mod transaction;
