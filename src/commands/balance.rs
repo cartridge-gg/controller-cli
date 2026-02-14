@@ -275,11 +275,11 @@ struct BalanceCache {
     balances: Vec<BalanceOutput>,
 }
 
-fn cache_path(storage_path: &PathBuf, account: &str) -> PathBuf {
+fn cache_path(storage_path: &std::path::Path, account: &str) -> PathBuf {
     storage_path.join(format!("balance_cache_{account}.json"))
 }
 
-fn load_cache(storage_path: &PathBuf, account: &str) -> Option<Vec<BalanceOutput>> {
+fn load_cache(storage_path: &std::path::Path, account: &str) -> Option<Vec<BalanceOutput>> {
     let path = cache_path(storage_path, account);
     let content = std::fs::read_to_string(&path).ok()?;
     let cache: BalanceCache = serde_json::from_str(&content).ok()?;
@@ -298,7 +298,7 @@ fn load_cache(storage_path: &PathBuf, account: &str) -> Option<Vec<BalanceOutput
     }
 }
 
-fn save_cache(storage_path: &PathBuf, account: &str, balances: &[BalanceOutput]) {
+fn save_cache(storage_path: &std::path::Path, account: &str, balances: &[BalanceOutput]) {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
