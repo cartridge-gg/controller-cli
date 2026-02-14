@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -7,6 +8,8 @@ pub struct Config {
     pub session: SessionConfig,
     #[serde(default)]
     pub cli: CliConfig,
+    #[serde(default)]
+    pub tokens: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,6 +121,14 @@ impl Config {
     }
 
     pub fn get_by_alias(&self, alias: &str) -> anyhow::Result<String> {
+        if let Some(symbol) = alias.strip_prefix("token.") {
+            return self
+                .tokens
+                .get(symbol)
+                .cloned()
+                .ok_or_else(|| anyhow::anyhow!("No custom token configured for '{symbol}'"));
+        }
+
         match alias {
             "rpc-url" => Ok(self.session.default_rpc_url.clone()),
             "keychain-url" => Ok(self.session.keychain_url.clone()),
@@ -127,7 +138,7 @@ impl Config {
             "colors" => Ok(self.cli.use_colors.to_string()),
             "callback-timeout" => Ok(self.cli.callback_timeout_seconds.to_string()),
             _ => anyhow::bail!(
-                "Unknown config key '{}'. Valid keys: {}",
+                "Unknown config key '{}'. Valid keys: {}, token.<symbol>",
                 alias,
                 Self::VALID_KEYS.join(", ")
             ),
@@ -135,6 +146,11 @@ impl Config {
     }
 
     pub fn set_by_alias(&mut self, alias: &str, value: &str) -> anyhow::Result<()> {
+        if let Some(symbol) = alias.strip_prefix("token.") {
+            self.tokens.insert(symbol.to_string(), value.to_string());
+            return Ok(());
+        }
+
         match alias {
             "rpc-url" => self.session.default_rpc_url = value.to_string(),
             "keychain-url" => self.session.keychain_url = value.to_string(),
@@ -158,7 +174,7 @@ impl Config {
                 })?;
             }
             _ => anyhow::bail!(
-                "Unknown config key '{}'. Valid keys: {}",
+                "Unknown config key '{}'. Valid keys: {}, token.<symbol>",
                 alias,
                 Self::VALID_KEYS.join(", ")
             ),

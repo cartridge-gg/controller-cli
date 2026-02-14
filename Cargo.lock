@@ -894,6 +894,7 @@ dependencies = [
  "colored",
  "dirs 5.0.1",
  "erased-serde",
+ "futures",
  "hex",
  "indicatif",
  "reqwest 0.12.28",

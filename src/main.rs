@@ -145,6 +145,20 @@ enum Commands {
         command: ConfigCommands,
     },
 
+    /// Query ERC20 token balances for the active session account
+    Balance {
+        /// Token symbol (e.g., 'eth', 'strk'). If omitted, queries all known tokens
+        symbol: Option<String>,
+
+        /// Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA') - auto-selects RPC URL
+        #[arg(long, conflicts_with = "rpc_url")]
+        chain_id: Option<String>,
+
+        /// RPC URL to use (overrides config)
+        #[arg(long, conflicts_with = "chain_id")]
+        rpc_url: Option<String>,
+    },
+
     /// Look up controller addresses by usernames or usernames by addresses
     Lookup {
         /// Comma-separated usernames to resolve (e.g., 'shinobi,sensei')
@@ -320,6 +334,11 @@ async fn main() {
             )
             .await
         }
+        Commands::Balance {
+            symbol,
+            chain_id,
+            rpc_url,
+        } => commands::balance::execute(&config, &*formatter, symbol, chain_id, rpc_url).await,
         Commands::Lookup {
             usernames,
             addresses,

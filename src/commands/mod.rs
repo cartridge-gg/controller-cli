@@ -1,3 +1,4 @@
+pub mod balance;
 pub mod call;
 pub mod calldata;
 pub mod clear;
