@@ -117,6 +117,28 @@ enum Commands {
         timeout: u64,
     },
 
+    /// Get transaction receipt
+    Receipt {
+        /// Transaction hash
+        hash: String,
+
+        /// Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA') - auto-selects RPC URL
+        #[arg(long, conflicts_with = "rpc_url")]
+        chain_id: Option<String>,
+
+        /// RPC URL to use (overrides config)
+        #[arg(long, conflicts_with = "chain_id")]
+        rpc_url: Option<String>,
+
+        /// Wait for transaction to be confirmed
+        #[arg(long)]
+        wait: bool,
+
+        /// Timeout in seconds when waiting
+        #[arg(long, default_value = "300")]
+        timeout: u64,
+    },
+
     /// Manage CLI configuration
     Config {
         #[command(subcommand)]
@@ -341,6 +363,16 @@ async fn main() {
                 timeout,
             )
             .await
+        }
+        Commands::Receipt {
+            hash,
+            chain_id,
+            rpc_url,
+            wait,
+            timeout,
+        } => {
+            commands::receipt::execute(&config, &*formatter, hash, chain_id, rpc_url, wait, timeout)
+                .await
         }
     };
 
