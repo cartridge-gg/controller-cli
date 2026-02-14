@@ -47,6 +47,9 @@ pub enum CliError {
     #[error("File error for {path}: {message}")]
     FileError { path: String, message: String },
 
+    #[error("Config error: {0}")]
+    Config(String),
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -68,6 +71,7 @@ impl CliError {
             CliError::TimeoutError(_) => "TimeoutError",
             CliError::NotFoundError(_) => "NotFoundError",
             CliError::FileError { .. } => "FileError",
+            CliError::Config(_) => "ConfigError",
             CliError::Other(_) => "UnknownError",
         }
     }
