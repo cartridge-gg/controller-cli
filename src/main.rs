@@ -159,6 +159,9 @@ enum Commands {
         rpc_url: Option<String>,
     },
 
+    /// Display the username associated with the active session account
+    Username,
+
     /// Look up controller addresses by usernames or usernames by addresses
     Lookup {
         /// Comma-separated usernames to resolve (e.g., 'shinobi,sensei')
@@ -339,6 +342,7 @@ async fn main() {
             chain_id,
             rpc_url,
         } => commands::balance::execute(&config, &*formatter, symbol, chain_id, rpc_url).await,
+        Commands::Username => commands::username::execute(&config, &*formatter).await,
         Commands::Lookup {
             usernames,
             addresses,
