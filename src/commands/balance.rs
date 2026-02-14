@@ -54,7 +54,7 @@ fn builtin_tokens() -> Vec<(&'static str, TokenInfo)> {
             },
         ),
         (
-            "SRVR",
+            "SURVIVOR",
             TokenInfo {
                 address: "0x042DD777885AD2C116be96d4D634abC90A26A790ffB5871E037Dd5Ae7d2Ec86B",
                 decimals: 18,
