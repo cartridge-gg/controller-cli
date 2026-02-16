@@ -1,6 +1,6 @@
 ---
 name: controller-cli
-description: Execute Starknet transactions using Cartridge Controller sessions with human-authorized policies. Use when the user wants to execute Starknet smart contract transactions, transfer tokens on Starknet, interact with gaming contracts, query contract state, look up Cartridge usernames/addresses, or manage session-based authentication.
+description: Execute Starknet transactions using Cartridge Controller sessions with human-authorized policies. Use when the user wants to execute Starknet smart contract transactions, transfer tokens on Starknet, interact with gaming contracts, query contract state, check token balances, look up Cartridge usernames/addresses, or manage session-based authentication.
 ---
 
 # Controller CLI
@@ -19,29 +19,24 @@ curl -fsSL https://raw.githubusercontent.com/cartridge-gg/controller-cli/main/in
 
 Sessions use keypair-based auth where humans authorize specific contracts/methods via browser, then the agent executes transactions within those constraints.
 
-1. **Check status** — `controller status --json`
-2. **Generate keypair** (if needed) — `controller generate --json`
-3. **Create policy file** — Define allowed contracts and methods
-4. **Register session** — `controller register --file policy.json --json` (user must authorize via browser URL)
-5. **Execute transactions** — `controller execute <contract> <entrypoint> <calldata> --json`
+1. **Check status** — `controller session status --json`
+2. **Authorize session** (if needed) — `controller session auth --file policy.json --json` (generates keypair + user must authorize via browser URL)
+3. **Execute transactions** — `controller execute <contract> <entrypoint> <calldata> --json`
 
 ## Commands
 
-### Status & Setup
+### Session Management
 
 ```bash
-controller status --json          # Check session status and expiration
-controller generate --json        # Generate new session keypair
-controller clear --yes            # Clear all session data
+controller session auth --file policy.json --json    # Generate keypair and authorize a new session
+controller session auth --preset loot-survivor --json # Use a preset policy
+controller session status --json                      # Check session status and expiration
+controller session list --json                        # List all active sessions
+controller session list --limit 20 --page 2 --json   # Paginated session list
+controller session clear --yes                        # Clear all session data
 ```
 
-### Register Session
-
-```bash
-controller register --file policy.json --json
-```
-
-Outputs an authorization URL. Display it to the user and wait — the command polls for up to 6 minutes until the user authorizes in their browser.
+The `session auth` command generates a keypair, outputs an authorization URL, and polls for up to 6 minutes until the user authorizes in their browser.
 
 ### Execute Transaction
 
@@ -70,6 +65,30 @@ controller call --file calls.json --chain-id SN_SEPOLIA --json
 controller transaction <hash> --chain-id SN_SEPOLIA [--wait] --json
 ```
 
+### Transaction Receipt
+
+```bash
+controller receipt <hash> --chain-id SN_SEPOLIA [--wait] --json
+```
+
+Returns full receipt: execution status, fee, events, messages, and execution resources.
+
+### Token Balances
+
+```bash
+controller balance --json                    # All non-zero token balances
+controller balance eth --json                # Specific token balance
+controller balance --chain-id SN_MAIN --json # Query mainnet balances
+```
+
+Built-in tokens: ETH, STRK, USDC, USD.e, LORDS, SURVIVOR, WBTC. Add custom tokens via `controller config set token.<SYMBOL> <address>`.
+
+### Account Username
+
+```bash
+controller username --json    # Display username for active session account
+```
+
 ### Username/Address Lookup
 
 ```bash
@@ -77,12 +96,24 @@ controller lookup --usernames shinobi,sensei --json
 controller lookup --addresses 0x123...,0x456... --json
 ```
 
+### Configuration
+
+```bash
+controller config set <key> <value>    # Set a config value
+controller config get <key> --json     # Get a config value
+controller config list --json          # List all config values
+```
+
+Valid keys: `rpc-url`, `keychain-url`, `api-url`, `storage-path`, `json-output`, `colors`, `callback-timeout`, `token.<symbol>`.
+
 ## Calldata Format
 
-- Values are comma-separated, hex with `0x` prefix by default
-- Decimal values: use `u256:100` prefix for automatic u256 encoding
-- String values: use `str:hello` prefix for automatic felt encoding
-- U256 manual encoding: split into low,high — e.g., 100 tokens = `0x64,0x0`
+- Values are comma-separated
+- Hex: `0x64` (standard hex felt)
+- Decimal: `100` (auto-converted)
+- `u256:` prefix: `u256:1000000000000000000` (auto-splits into low/high 128-bit felts)
+- `str:` prefix: `str:hello` (Cairo short string encoding)
+- Manual u256: split into low,high — e.g., 100 tokens = `0x64,0x0`
 
 ## Policy File Format
 
@@ -126,10 +157,10 @@ See [references/policy-examples.md](references/policy-examples.md) for complete 
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| NoSession | No keypair found | Run `controller generate` |
-| SessionExpired | Session expired | Run `controller register --file policy.json` |
-| ManualExecutionRequired | No authorized session | Register session with appropriate policies |
-| PolicyViolation | Transaction not in allowed policies | Register new session with expanded policies |
+| NoSession | No keypair found | Run `controller session auth --file policy.json` |
+| SessionExpired | Session expired | Run `controller session auth --file policy.json` |
+| ManualExecutionRequired | No authorized session | Authorize session with appropriate policies |
+| PolicyViolation | Transaction not in allowed policies | Authorize new session with expanded policies |
 
 ## Important Notes
 

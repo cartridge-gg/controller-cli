@@ -1,42 +1,86 @@
 {
   "name": "controller",
   "description": "Execute Starknet transactions using Cartridge Controller sessions with human-authorized policies",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "tools": [
     {
-      "name": "controller_generate",
-      "description": "Generate a new session keypair for signing Starknet transactions. First step in session setup.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {},
-        "required": []
-      },
-      "command": "controller generate --json"
-    },
-    {
-      "name": "controller_status",
-      "description": "Check current session status, expiration time, and keypair information. Use before executing transactions.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {},
-        "required": []
-      },
-      "command": "controller status --json"
-    },
-    {
-      "name": "controller_register",
-      "description": "Register a new session with specific contract/method policies. IMPORTANT: Requires human to authorize via browser. Display the authorization URL to the user and wait for them to authorize.",
+      "name": "controller_session_auth",
+      "description": "Generate a keypair and authorize a new session. Combines keypair generation and session registration in a single step. IMPORTANT: Requires human to authorize via browser. Display the authorization URL to the user and wait for them to authorize.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "policy_file": {
             "type": "string",
             "description": "Path to JSON policy file defining allowed contracts and methods"
+          },
+          "preset": {
+            "type": "string",
+            "description": "Preset name (e.g., 'loot-survivor'). Alternative to policy_file."
+          },
+          "chain_id": {
+            "type": "string",
+            "description": "Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA')"
+          },
+          "rpc_url": {
+            "type": "string",
+            "description": "RPC URL (overrides config, conflicts with chain_id)"
           }
         },
-        "required": ["policy_file"]
+        "anyOf": [
+          {"required": ["policy_file"]},
+          {"required": ["preset"]}
+        ]
       },
-      "command": "controller register --file {policy_file} --json"
+      "command": "controller session auth {policy_file:--file} {preset:--preset} {chain_id:--chain-id} {rpc_url:--rpc-url} --json"
+    },
+    {
+      "name": "controller_session_status",
+      "description": "Check current session status, expiration time, and keypair information. Use before executing transactions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "command": "controller session status --json"
+    },
+    {
+      "name": "controller_session_list",
+      "description": "List all active sessions for the account with pagination support.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "chain_id": {
+            "type": "string",
+            "description": "Chain ID to filter sessions (defaults to session chain)"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Sessions per page (default: 10)",
+            "default": 10
+          },
+          "page": {
+            "type": "number",
+            "description": "Page number starting from 1 (default: 1)",
+            "default": 1
+          }
+        }
+      },
+      "command": "controller session list {chain_id:--chain-id} {limit:--limit} {page:--page} --json"
+    },
+    {
+      "name": "controller_session_clear",
+      "description": "Clear all stored session data and keypairs. Use to reset or troubleshoot.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "yes": {
+            "type": "boolean",
+            "description": "Skip confirmation prompt",
+            "default": true
+          }
+        }
+      },
+      "command": "controller session clear {yes:--yes}"
     },
     {
       "name": "controller_execute",
@@ -54,7 +98,7 @@
           },
           "calldata": {
             "type": "string",
-            "description": "Comma-separated calldata values (hex with 0x prefix). Use with contract and entrypoint for single call."
+            "description": "Comma-separated calldata values. Supports hex, decimal, u256:, and str: prefixes."
           },
           "file": {
             "type": "string",
@@ -79,6 +123,142 @@
       "command": "controller execute {contract:--contract} {entrypoint:--entrypoint} {calldata:--calldata} {file:--file} {wait:--wait} {timeout:--timeout} --json"
     },
     {
+      "name": "controller_call",
+      "description": "Execute a read-only call to a contract (no session required). Use to query contract state.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contract": {
+            "type": "string",
+            "description": "Contract address (hex with 0x prefix)"
+          },
+          "entrypoint": {
+            "type": "string",
+            "description": "Function name to call"
+          },
+          "calldata": {
+            "type": "string",
+            "description": "Comma-separated calldata values (hex with 0x prefix)"
+          },
+          "file": {
+            "type": "string",
+            "description": "Path to JSON file with multiple calls"
+          },
+          "chain_id": {
+            "type": "string",
+            "description": "Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA')"
+          },
+          "rpc_url": {
+            "type": "string",
+            "description": "RPC URL (overrides config, conflicts with chain_id)"
+          },
+          "block_id": {
+            "type": "string",
+            "description": "Block ID to query (latest, pending, block number, or block hash)"
+          }
+        }
+      },
+      "command": "controller call {contract} {entrypoint} {calldata} {file:--file} {chain_id:--chain-id} {rpc_url:--rpc-url} {block_id:--block-id} --json"
+    },
+    {
+      "name": "controller_transaction",
+      "description": "Get transaction status and details. Use to check if a transaction has been confirmed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hash": {
+            "type": "string",
+            "description": "Transaction hash"
+          },
+          "chain_id": {
+            "type": "string",
+            "description": "Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA')"
+          },
+          "rpc_url": {
+            "type": "string",
+            "description": "RPC URL (overrides config, conflicts with chain_id)"
+          },
+          "wait": {
+            "type": "boolean",
+            "description": "Wait for transaction to be confirmed (default: false)",
+            "default": false
+          },
+          "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds when waiting (default: 300)",
+            "default": 300
+          }
+        },
+        "required": ["hash"]
+      },
+      "command": "controller transaction {hash} {chain_id:--chain-id} {rpc_url:--rpc-url} {wait:--wait} {timeout:--timeout} --json"
+    },
+    {
+      "name": "controller_receipt",
+      "description": "Get the full transaction receipt including execution status, fee, events, messages, and execution resources.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hash": {
+            "type": "string",
+            "description": "Transaction hash"
+          },
+          "chain_id": {
+            "type": "string",
+            "description": "Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA')"
+          },
+          "rpc_url": {
+            "type": "string",
+            "description": "RPC URL (overrides config, conflicts with chain_id)"
+          },
+          "wait": {
+            "type": "boolean",
+            "description": "Wait for receipt to be available (default: false)",
+            "default": false
+          },
+          "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds when waiting (default: 300)",
+            "default": 300
+          }
+        },
+        "required": ["hash"]
+      },
+      "command": "controller receipt {hash} {chain_id:--chain-id} {rpc_url:--rpc-url} {wait:--wait} {timeout:--timeout} --json"
+    },
+    {
+      "name": "controller_balance",
+      "description": "Query ERC20 token balances for the active session account. Built-in tokens: ETH, STRK, USDC, USD.e, LORDS, SURVIVOR, WBTC. Prefer this over raw call balance_of.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "Token symbol (e.g., 'eth', 'strk'). If omitted, queries all known tokens."
+          },
+          "chain_id": {
+            "type": "string",
+            "description": "Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA')"
+          },
+          "rpc_url": {
+            "type": "string",
+            "description": "RPC URL (overrides config, conflicts with chain_id)"
+          }
+        }
+      },
+      "command": "controller balance {symbol} {chain_id:--chain-id} {rpc_url:--rpc-url} --json"
+    },
+    {
+      "name": "controller_username",
+      "description": "Display the Cartridge username associated with the active session account.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "command": "controller username --json"
+    },
+    {
       "name": "controller_lookup",
       "description": "Look up Cartridge controller addresses by usernames or usernames by addresses. Returns username:address pairs.",
       "inputSchema": {
@@ -101,46 +281,78 @@
       "command": "controller lookup {usernames:--usernames} {addresses:--addresses} --json"
     },
     {
-      "name": "controller_clear",
-      "description": "Clear all stored session data and keypairs. Use to reset or troubleshoot.",
+      "name": "controller_config_set",
+      "description": "Set a CLI configuration value.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "yes": {
-            "type": "boolean",
-            "description": "Skip confirmation prompt",
-            "default": true
+          "key": {
+            "type": "string",
+            "description": "Config key (e.g., rpc-url, json-output, token.<symbol>)"
+          },
+          "value": {
+            "type": "string",
+            "description": "Value to set"
           }
-        }
+        },
+        "required": ["key", "value"]
       },
-      "command": "controller clear {yes:--yes}"
+      "command": "controller config set {key} {value}"
+    },
+    {
+      "name": "controller_config_get",
+      "description": "Get a CLI configuration value.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Config key (e.g., rpc-url, json-output, token.<symbol>)"
+          }
+        },
+        "required": ["key"]
+      },
+      "command": "controller config get {key} --json"
+    },
+    {
+      "name": "controller_config_list",
+      "description": "List all CLI configuration values.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "command": "controller config list --json"
     }
   ],
   "examples": [
     {
       "title": "Check Session Status",
-      "tool": "controller_status",
+      "tool": "controller_session_status",
       "input": {}
     },
     {
-      "title": "Generate Keypair",
-      "tool": "controller_generate",
-      "input": {}
+      "title": "Authorize Session with Preset",
+      "tool": "controller_session_auth",
+      "input": {
+        "preset": "loot-survivor",
+        "chain_id": "SN_MAIN"
+      }
     },
     {
-      "title": "Register Session",
-      "tool": "controller_register",
+      "title": "Authorize Session with Policy File",
+      "tool": "controller_session_auth",
       "input": {
         "policy_file": "policy.json"
       }
     },
     {
-      "title": "Transfer Tokens",
+      "title": "Transfer Tokens (u256 prefix)",
       "tool": "controller_execute",
       "input": {
         "contract": "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
         "entrypoint": "transfer",
-        "calldata": "0xRECIPIENT,0x64,0x0"
+        "calldata": "0xRECIPIENT,u256:1000000000000000000"
       }
     },
     {
@@ -152,6 +364,26 @@
       }
     },
     {
+      "title": "Check Token Balance",
+      "tool": "controller_balance",
+      "input": {
+        "symbol": "eth"
+      }
+    },
+    {
+      "title": "Get Transaction Receipt",
+      "tool": "controller_receipt",
+      "input": {
+        "hash": "0xTRANSACTION_HASH",
+        "chain_id": "SN_SEPOLIA"
+      }
+    },
+    {
+      "title": "Get Account Username",
+      "tool": "controller_username",
+      "input": {}
+    },
+    {
       "title": "Look Up Usernames",
       "tool": "controller_lookup",
       "input": {
@@ -159,11 +391,9 @@
       }
     },
     {
-      "title": "Look Up Addresses",
-      "tool": "controller_lookup",
-      "input": {
-        "addresses": "0x123...,0x456..."
-      }
+      "title": "List Active Sessions",
+      "tool": "controller_session_list",
+      "input": {}
     }
   ],
   "commonContracts": {

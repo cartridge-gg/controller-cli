@@ -32,15 +32,19 @@ git clone https://github.com/cartridge-gg/controller-cli.git /tmp/controller-cli
   ln -sf /tmp/controller-cli/.claude/skills/controller-skill ~/.claude/skills/controller-skill
 ```
 
-Once installed, 8 tools become available:
-- `controller_generate` - Generate session keypair
-- `controller_status` - Check session status
-- `controller_register` - Register session (requires human auth)
+Once installed, tools become available:
+- `controller_session_auth` - Generate keypair and authorize a new session
+- `controller_session_status` - Check session status
+- `controller_session_list` - List active sessions
+- `controller_session_clear` - Clear session data
 - `controller_execute` - Execute transactions
 - `controller_call` - Read-only contract calls
 - `controller_transaction` - Get transaction status
+- `controller_receipt` - Get transaction receipt
+- `controller_balance` - Check token balances
+- `controller_username` - Get account username
 - `controller_lookup` - Look up usernames/addresses
-- `controller_clear` - Clear session data
+- `controller_config` - Manage CLI configuration
 
 **See:** [Skill Documentation](./.claude/skills/controller-skill/README.md)
 
@@ -48,27 +52,10 @@ Once installed, 8 tools become available:
 
 ## Workflow
 
-### 1. Generate Keypair
+### 1. Check Status
 
 ```bash
-controller generate --json
-```
-
-Output:
-```json
-{
-  "public_key": "0x...",
-  "stored_at": "~/.config/controller-cli",
-  "message": "Keypair generated successfully. Use this public key for session registration."
-}
-```
-
-**Security Note:** The private key is stored locally. Even if compromised, the session is scoped to only the authorized contracts, methods, and expiry window (typically 7 days).
-
-### 2. Check Status
-
-```bash
-controller status --json
+controller session status --json
 ```
 
 **Status states:**
@@ -95,16 +82,18 @@ Active session output:
 }
 ```
 
-### 3. Register Session
+### 2. Authorize Session
 
 **Requirements:** Human user must authorize via browser. Specify either a preset or a local policy file, plus a network.
+
+The `session auth` command combines keypair generation and session registration in a single step.
 
 #### Option A: Use a Preset (Recommended)
 
 For popular games/apps, use a preset from [cartridge-gg/presets](https://github.com/cartridge-gg/presets/tree/main/configs):
 
 ```bash
-controller register \
+controller session auth \
   --preset loot-survivor \
   --chain-id SN_MAIN \
   --json
@@ -133,7 +122,7 @@ Create `policy.json`:
 ```
 
 ```bash
-controller register \
+controller session auth \
   --file policy.json \
   --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
   --json
@@ -156,15 +145,14 @@ JSON output:
 2. Ask them to open it in their browser and authorize
 3. The command waits automatically and stores the session when authorized (up to 6 minutes)
 
-### 4. Execute Transaction
+### 3. Execute Transaction
 
 **Single call (positional args: contract, entrypoint, calldata):**
 ```bash
 controller execute \
   0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
   transfer \
-  0xRECIPIENT_ADDRESS,0xAMOUNT_LOW,0xAMOUNT_HIGH \
-  --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
+  0xRECIPIENT_ADDRESS,u256:1000000000000000000 \
   --json
 ```
 
@@ -189,7 +177,6 @@ controller execute \
 ```bash
 controller execute \
   --file calls.json \
-  --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
   --json
 ```
 
@@ -205,7 +192,7 @@ Output:
 - **Mainnet:** `https://voyager.online/tx/0x...`
 - **Sepolia:** `https://sepolia.voyager.online/tx/0x...`
 
-### 5. Read-Only Call
+### 4. Read-Only Call
 
 Execute a read-only call to query contract state without submitting a transaction.
 
@@ -237,7 +224,7 @@ controller call --file calls.json --chain-id SN_SEPOLIA --json
 
 **Note:** `call` does not require an active session. It only needs a network (via `--chain-id` or `--rpc-url`).
 
-### 6. Get Transaction Status
+### 5. Get Transaction Status
 
 Check the status and details of a submitted transaction.
 
@@ -256,7 +243,62 @@ controller transaction 0xTRANSACTION_HASH \
   --json
 ```
 
-### 7. Look Up Usernames / Addresses
+### 6. Get Transaction Receipt
+
+Get the full transaction receipt including execution status, fee, events, and messages.
+
+```bash
+controller receipt 0xTRANSACTION_HASH \
+  --chain-id SN_SEPOLIA \
+  --json
+```
+
+**Wait for receipt to be available:**
+```bash
+controller receipt 0xTRANSACTION_HASH \
+  --chain-id SN_SEPOLIA \
+  --wait \
+  --timeout 300 \
+  --json
+```
+
+### 7. Check Token Balances
+
+Query ERC20 token balances for the active session account.
+
+```bash
+# All non-zero balances
+controller balance --json
+
+# Specific token
+controller balance eth --json
+
+# Query on mainnet
+controller balance --chain-id SN_MAIN --json
+```
+
+Built-in tokens: ETH, STRK, USDC, USD.e, LORDS, SURVIVOR, WBTC. Add custom tokens:
+```bash
+controller config set token.MYTOKEN 0x123...
+```
+
+Output:
+```json
+[
+  { "token": "ETH", "balance": "0.500000", "raw": "0x6f05b59d3b20000", "contract": "0x049d36..." },
+  { "token": "STRK", "balance": "100.000000", "raw": "0x56bc75e2d63100000", "contract": "0x04718f..." }
+]
+```
+
+### 8. Get Account Username
+
+Display the Cartridge username for the active session account.
+
+```bash
+controller username --json
+```
+
+### 9. Look Up Usernames / Addresses
 
 Resolve Cartridge controller usernames to addresses or vice versa:
 
@@ -283,16 +325,57 @@ Output:
 
 Each entry is a `username:address` pair. You can combine both flags in a single call. See the [Cartridge Usernames API](https://docs.cartridge.gg/controller/usernames) for limits and rate-limiting details.
 
-### 8. Wait for Confirmation (Optional)
+### 10. Session Management
 
-Add `--wait` to wait for transaction confirmation (default 300 second timeout):
+**List active sessions:**
+```bash
+controller session list --json
+controller session list --limit 20 --page 2 --json
+```
+
+**Clear all session data:**
+```bash
+controller session clear --yes
+```
+
+### 11. Configuration
+
+Manage CLI settings without editing the config file directly.
 
 ```bash
-controller execute \
-  --file calls.json \
-  --rpc-url https://api.cartridge.gg/x/starknet/sepolia \
-  --wait \
-  --json
+# Set a value
+controller config set rpc-url https://api.cartridge.gg/x/starknet/mainnet
+
+# Get a value
+controller config get rpc-url --json
+
+# List all values
+controller config list --json
+```
+
+Valid keys: `rpc-url`, `keychain-url`, `api-url`, `storage-path`, `json-output`, `colors`, `callback-timeout`, `token.<symbol>`.
+
+---
+
+## Calldata Formats
+
+Calldata values support multiple formats:
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| Hex | `0x64` | Standard hex felt |
+| Decimal | `100` | Decimal felt (auto-converted) |
+| `u256:` | `u256:1000000000000000000` | Auto-splits into low/high 128-bit felts |
+| `str:` | `str:hello` | Cairo short string encoding |
+
+The `u256:` prefix is the recommended way to specify token amounts. It eliminates manual low/high splitting:
+
+```bash
+# Using u256: prefix (recommended)
+controller execute 0x04718f... transfer 0xRECIPIENT,u256:1000000000000000000 --json
+
+# Equivalent manual split
+controller execute 0x04718f... transfer 0xRECIPIENT,0xDE0B6B3A7640000,0x0 --json
 ```
 
 ---
@@ -312,12 +395,12 @@ For SLOT or custom chains, use `--rpc-url` with your Katana endpoint.
 
 ### How to Specify Network
 
-- **Presets:** Use `--chain-id SN_MAIN` or `--chain-id SN_SEPOLIA` (simplest)
-- **Policy files / execute:** Use `--rpc-url <url>` (explicit)
+- **Session auth:** Use `--chain-id SN_MAIN` or `--chain-id SN_SEPOLIA` (simplest)
+- **Execute/call/transaction:** Use `--chain-id` or `--rpc-url` (explicit)
 
 ### When Network is Ambiguous
 
-1. Run `controller status --json` to check the current session's `chain_id`
+1. Run `controller session status --json` to check the current session's `chain_id`
 2. Use the same network, or ask the user
 
 ### Priority Order
@@ -365,27 +448,13 @@ All errors return JSON:
 
 | Error Code | Cause | Recovery |
 |------------|-------|----------|
-| `NoSession` | No keypair found | Run `controller generate --json` |
-| `SessionExpired` | Session past expiry | Run `controller register` again |
-| `ManualExecutionRequired` | No authorized session for this transaction | Register session with appropriate policies |
-| `CallbackTimeout` | User didn't authorize within 360s | Retry `register`, ask user to authorize faster |
+| `NoSession` | No keypair found | Run `controller session auth --file policy.json --json` |
+| `SessionExpired` | Session past expiry | Run `controller session auth` again |
+| `ManualExecutionRequired` | No authorized session for this transaction | Authorize session with appropriate policies |
+| `CallbackTimeout` | User didn't authorize within 360s | Retry `session auth`, ask user to authorize faster |
 | `InvalidInput` (UnsupportedChainId) | Bad chain ID | Use `SN_MAIN` or `SN_SEPOLIA`, or `--rpc-url` for custom chains |
 | `InvalidInput` (PresetNotFound) | Unknown preset name | Check [available presets](https://github.com/cartridge-gg/presets/tree/main/configs) |
 | `InvalidInput` (PresetChainNotSupported) | Preset doesn't support requested chain | Use a supported chain or create a custom policy file |
-
----
-
-## Transaction Amounts (u256)
-
-Starknet uses u256 for token amounts, split into low/high u128:
-
-```
-calldata: ["0xrecipient", "0x64", "0x0"]
-                           ^^^^   ^^^^
-                           low    high
-```
-
-For amounts that fit in u128 (most cases), set high to `0x0`.
 
 ---
 
@@ -398,7 +467,7 @@ The lookup + execute commands combine to enable natural-language workflows. An L
 > "Send 1 STRK to broody"
 
 1. `controller lookup --usernames broody --json` → resolves to `broody:0xABC...`
-2. `controller execute 0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d transfer 0xABC...,0xDE0B6B3A7640000,0x0 --json`
+2. `controller execute 0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d transfer 0xABC...,u256:1000000000000000000 --json`
 
 ### Interact with a game using a player's username
 
@@ -413,6 +482,12 @@ The lookup + execute commands combine to enable natural-language workflows. An L
 
 1. `controller lookup --addresses 0x123... --json` → resolves to `shinobi:0x123...`
 
+### Check account balance
+
+> "How much ETH do I have?"
+
+1. `controller balance eth --json` → returns balance with formatted and raw values
+
 ---
 
 ## Best Practices
@@ -425,6 +500,8 @@ The lookup + execute commands combine to enable natural-language workflows. An L
 6. **Handle errors** by checking `error_code` and following `recovery_hint`
 7. **Validate addresses** (must be hex with 0x prefix)
 8. **Always use Voyager** for transaction links, never Starkscan
+9. **Use `u256:` prefix** for token amounts instead of manual low/high splitting
+10. **Use `balance` command** instead of raw `call balance_of` for token balance queries
 
 ---
 
