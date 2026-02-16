@@ -6,9 +6,8 @@ Command-line interface for managing Cartridge Controller sessions on Starknet.
 
 Enables automated Starknet transaction execution through a human-in-the-loop workflow:
 
-1. **Generate a keypair** — Creates session signing keys
-2. **Register a session** — Creates authorization URL, human approves in browser, CLI auto-retrieves credentials
-3. **Execute transactions** — Autonomously executes within authorized policies
+1. **Authorize a session** — Generates keypair, creates authorization URL, human approves in browser, CLI auto-retrieves credentials
+2. **Execute transactions** — Autonomously executes within authorized policies
 
 The human operator maintains full control by authorizing specific contracts and methods through the browser.
 
@@ -32,29 +31,21 @@ cargo install --git https://github.com/cartridge-gg/controller-cli
 
 ## Usage
 
-### 1. Generate a Keypair
+### 1. Authorize a Session
 
 ```bash
-controller generate
-```
-
-Creates and stores a new session keypair. The private key is stored locally — even if compromised, the session is scoped to only the authorized contracts, methods, and time window.
-
-### 2. Register a Session
-
-```bash
-controller register --file policies.json --chain-id SN_MAIN
+controller session auth --file policies.json --chain-id SN_MAIN
 ```
 
 Or use a preset for popular games/apps:
 
 ```bash
-controller register --preset loot-survivor --chain-id SN_MAIN
+controller session auth --preset loot-survivor --chain-id SN_MAIN
 ```
 
-The CLI generates an authorization URL, displays it, then automatically polls until you authorize in the browser and stores the session.
+This generates a new keypair, creates an authorization URL, and automatically polls until you authorize in the browser and stores the session.
 
-### 3. Execute Transactions
+### 2. Execute Transactions
 
 **Single call (positional args):**
 
@@ -62,7 +53,7 @@ The CLI generates an authorization URL, displays it, then automatically polls un
 controller execute \
   0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 \
   transfer \
-  0xrecipient,0x100,0x0
+  0xrecipient,u256:1000000000000000000
 ```
 
 **Multiple calls from file:**
@@ -79,7 +70,7 @@ controller execute --file calls.json --wait --timeout 300
 
 Transactions are auto-subsidized via paymaster when possible. Use `--no-paymaster` to pay with user funds directly.
 
-### 4. Read-Only Calls
+### 3. Read-Only Calls
 
 ```bash
 controller call \
@@ -90,7 +81,20 @@ controller call \
 
 Use `--block-id` to query at a specific block (`latest`, `pending`, a block number, or block hash).
 
-### 5. Get Transaction Status
+### Calldata Formats
+
+Calldata values support multiple formats:
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| Hex | `0x64` | Standard hex felt |
+| Decimal | `100` | Decimal felt |
+| `u256:` | `u256:1000000000000000000` | Auto-splits into low/high 128-bit felts |
+| `str:` | `str:hello` | Cairo short string |
+
+The `u256:` prefix eliminates the need to manually split token amounts into low/high parts.
+
+### 4. Get Transaction Status
 
 ```bash
 controller transaction 0xTRANSACTION_HASH --chain-id SN_SEPOLIA
@@ -98,13 +102,25 @@ controller transaction 0xTRANSACTION_HASH --chain-id SN_SEPOLIA
 
 Add `--wait` to poll until the transaction is confirmed.
 
-### 6. Check Status
+### 5. Get Transaction Receipt
 
 ```bash
-controller status
+controller receipt 0xTRANSACTION_HASH --chain-id SN_SEPOLIA
 ```
 
-Returns `no_session`, `keypair_only`, or `active` with expiration details.
+Returns the full receipt including execution status, fee, events, and messages. Add `--wait` to poll until available.
+
+### 6. Check Balances
+
+```bash
+# Query all token balances for the active session account
+controller balance
+
+# Query a specific token
+controller balance eth
+```
+
+Queries ERC20 balances for the active session account. Built-in tokens: ETH, STRK, USDC, USD.e, LORDS, SURVIVOR, WBTC. Custom tokens can be added via `config set token.<SYMBOL> <address>`.
 
 ### 7. Look Up Usernames / Addresses
 
@@ -118,11 +134,45 @@ controller lookup --addresses 0x123...,0x456...
 
 Returns `username:address` pairs. See the [Cartridge Usernames docs](https://docs.cartridge.gg/controller/usernames) for API details.
 
-### 8. Clear Session
+### 8. Get Account Username
 
 ```bash
-controller clear
+controller username
 ```
+
+Displays the Cartridge username associated with the active session account.
+
+### 9. Session Management
+
+```bash
+# Check session status (no_session, keypair_only, or active with expiration)
+controller session status
+
+# List all active sessions with pagination
+controller session list
+controller session list --limit 20 --page 2
+
+# Clear all stored session data
+controller session clear
+```
+
+### 10. Configuration
+
+```bash
+# Set a config value
+controller config set rpc-url https://api.cartridge.gg/x/starknet/mainnet
+
+# Get a config value
+controller config get rpc-url
+
+# List all config values
+controller config list
+
+# Add a custom token for balance tracking
+controller config set token.MYTOKEN 0x123...
+```
+
+Valid keys: `rpc-url`, `keychain-url`, `api-url`, `storage-path`, `json-output`, `colors`, `callback-timeout`, `token.<symbol>`.
 
 ## Session Policies
 
@@ -152,7 +202,7 @@ Available presets: `loot-survivor`, `influence`, `realms`, `pistols`, `dope-wars
 All commands support `--json` for machine-readable output:
 
 ```bash
-controller status --json
+controller session status --json
 ```
 
 ```json
@@ -182,8 +232,7 @@ Errors include `error_code`, `message`, and `recovery_hint` for programmatic han
 ```toml
 [session]
 storage_path = "~/.config/controller-cli"
-default_chain_id = "SN_SEPOLIA"
-default_rpc_url = "https://api.cartridge.gg/x/starknet/sepolia"
+rpc_url = "https://api.cartridge.gg/x/starknet/sepolia"
 keychain_url = "https://x.cartridge.gg"
 api_url = "https://api.cartridge.gg/query"
 
@@ -191,6 +240,9 @@ api_url = "https://api.cartridge.gg/query"
 json_output = false
 use_colors = true
 callback_timeout_seconds = 300
+
+[tokens]
+MYTOKEN = "0x123..."
 ```
 
 ### Environment Variables
@@ -198,9 +250,7 @@ callback_timeout_seconds = 300
 | Variable | Description |
 |----------|-------------|
 | `CARTRIDGE_STORAGE_PATH` | Override storage location |
-| `CARTRIDGE_CHAIN_ID` | Default chain ID (`SN_MAIN` or `SN_SEPOLIA`) |
 | `CARTRIDGE_RPC_URL` | Default RPC endpoint |
-| `CARTRIDGE_API_URL` | Override API endpoint |
 | `CARTRIDGE_JSON_OUTPUT` | Default to JSON output |
 
 ## Architecture
