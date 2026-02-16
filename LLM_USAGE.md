@@ -405,9 +405,10 @@ For SLOT or custom chains, use `--rpc-url` with your Katana endpoint.
 
 ### Priority Order
 
-1. `--rpc-url` flag (highest)
-2. Stored session RPC URL (from registration)
-3. Config.toml default (lowest)
+1. `--chain-id` or `--rpc-url` flag (highest)
+2. Explicit config/env (`config set rpc-url` or `CARTRIDGE_RPC_URL`)
+3. Stored session RPC URL (from authorization)
+4. Default (SN_SEPOLIA)
 
 ---
 
