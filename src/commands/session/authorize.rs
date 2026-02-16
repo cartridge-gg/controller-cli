@@ -138,11 +138,13 @@ pub async fn execute(
                 )));
             }
         }
-    } else if let Some(ref url) = rpc_url {
-        Some(url.clone())
+    } else if rpc_url.is_some() {
+        rpc_url.clone()
+    } else if config.session.rpc_url_explicitly_set {
+        Some(config.session.rpc_url.clone())
     } else {
         formatter.warning("No --chain-id or --rpc-url specified, using SN_SEPOLIA by default");
-        Some("https://api.cartridge.gg/x/starknet/sepolia".to_string())
+        Some(config.session.rpc_url.clone())
     };
 
     // Generate a new session keypair
@@ -172,8 +174,10 @@ pub async fn execute(
         // Fetch preset from GitHub
         let preset_config = presets::fetch_preset(&preset_name).await?;
 
-        // If resolved_rpc_url is provided, extract chain-specific policies
-        if let Some(ref rpc_url_str) = resolved_rpc_url {
+        // Use resolved RPC URL or fall back to config default for preset chain detection
+        let preset_rpc_url = resolved_rpc_url.as_ref().unwrap_or(&config.session.rpc_url);
+        {
+            let rpc_url_str = preset_rpc_url;
             let provider = starknet::providers::jsonrpc::JsonRpcClient::new(
                 starknet::providers::jsonrpc::HttpTransport::new(
                     url::Url::parse(rpc_url_str)
@@ -223,11 +227,6 @@ pub async fn execute(
                 contracts,
                 messages: chain_policies.messages,
             }
-        } else {
-            return Err(CliError::InvalidInput(
-                "--chain-id or --rpc-url is required when using --preset to determine which chain policies to use"
-                    .to_string(),
-            ));
         }
     } else if let Some(file_path) = file {
         // Load from local file
@@ -322,9 +321,7 @@ pub async fn execute(
     let parsed_policies = policy_vec;
 
     // Use CLI flag if provided, otherwise use config
-    let effective_rpc_url = resolved_rpc_url
-        .as_ref()
-        .unwrap_or(&config.session.default_rpc_url);
+    let effective_rpc_url = resolved_rpc_url.as_ref().unwrap_or(&config.session.rpc_url);
 
     // If --rpc-url or --chain-id was provided, validate it's a Cartridge RPC endpoint
     if let Some(ref url) = resolved_rpc_url {
@@ -558,8 +555,8 @@ fn store_session_from_api(
         address,
         chain_id,
         class_hash: starknet::core::types::Felt::ZERO, // Not needed for execution
-        rpc_url: "".to_string(), // Not used (CLI uses config.session.default_rpc_url)
-        salt: starknet::core::types::Felt::ZERO, // Not needed for execution
+        rpc_url: "".to_string(),                       // Not used (CLI uses config.session.rpc_url)
+        salt: starknet::core::types::Felt::ZERO,       // Not needed for execution
         owner: Owner::Account(starknet::core::types::Felt::ZERO), // Not needed for execution with authorization
         username: session_info.controller.account_id.clone(),     // Use account_id as username
     };

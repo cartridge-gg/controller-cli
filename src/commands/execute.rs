@@ -45,9 +45,12 @@ pub async fn execute(
     file: Option<String>,
     wait: bool,
     timeout: u64,
+    chain_id: Option<String>,
     rpc_url: Option<String>,
     no_paymaster: bool,
 ) -> Result<()> {
+    // Resolve --chain-id to RPC URL
+    let rpc_url = resolve_chain_id_to_rpc(chain_id, rpc_url)?;
     // Parse calls from arguments or file
     let calls = if let Some(file_path) = file {
         // Load calls from JSON file
@@ -119,16 +122,23 @@ pub async fn execute(
     let signing_key = starknet::signers::SigningKey::from_secret_scalar(credentials.private_key);
     let owner = Owner::Signer(Signer::Starknet(signing_key));
 
-    // Priority: CLI flag > stored session RPC > config default
+    // Priority: CLI flag > config > stored session RPC
     let effective_rpc_url = rpc_url
         .clone()
+        .or_else(|| {
+            if config.session.rpc_url_explicitly_set {
+                Some(config.session.rpc_url.clone())
+            } else {
+                None
+            }
+        })
         .or_else(|| {
             backend.get("session_rpc_url").ok().and_then(|v| match v {
                 Some(StorageValue::String(url)) => Some(url),
                 _ => None,
             })
         })
-        .unwrap_or_else(|| config.session.default_rpc_url.clone());
+        .unwrap_or_else(|| config.session.rpc_url.clone());
 
     // Load stored policies for pre-execution validation
     let stored_policies: Option<PolicyStorage> = backend
@@ -526,5 +536,26 @@ mod tests {
         let err = validate_calls_against_policies(&calls, &policies).unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("No calls"), "got: {}", msg);
+    }
+}
+
+/// Resolve --chain-id to an RPC URL, or pass through --rpc-url as-is.
+fn resolve_chain_id_to_rpc(
+    chain_id: Option<String>,
+    rpc_url: Option<String>,
+) -> Result<Option<String>> {
+    match chain_id {
+        Some(chain) => match chain.as_str() {
+            "SN_MAIN" => Ok(Some(
+                "https://api.cartridge.gg/x/starknet/mainnet".to_string(),
+            )),
+            "SN_SEPOLIA" => Ok(Some(
+                "https://api.cartridge.gg/x/starknet/sepolia".to_string(),
+            )),
+            _ => Err(CliError::InvalidInput(format!(
+                "Unsupported chain ID '{chain}'. Supported chains: SN_MAIN, SN_SEPOLIA"
+            ))),
+        },
+        None => Ok(rpc_url),
     }
 }

@@ -58,8 +58,12 @@ enum Commands {
         #[arg(long, default_value = "300")]
         timeout: u64,
 
+        /// Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA') - auto-selects RPC URL
+        #[arg(long, conflicts_with = "rpc_url")]
+        chain_id: Option<String>,
+
         /// RPC URL to use (overrides config and stored session RPC)
-        #[arg(long)]
+        #[arg(long, conflicts_with = "chain_id")]
         rpc_url: Option<String>,
 
         /// Force self-pay (don't use paymaster)
@@ -320,6 +324,7 @@ async fn main() {
             file,
             wait,
             timeout,
+            chain_id,
             rpc_url,
             no_paymaster,
         } => {
@@ -332,6 +337,7 @@ async fn main() {
                 file,
                 wait,
                 timeout,
+                chain_id,
                 rpc_url,
                 no_paymaster,
             )

@@ -300,9 +300,9 @@ fn resolve_rpc_url(
                 "Unsupported chain ID '{chain}'. Supported chains: SN_MAIN, SN_SEPOLIA"
             ))),
         }
-    } else if !config.session.default_rpc_url.is_empty() {
+    } else if !config.session.rpc_url.is_empty() {
         // Fall back to config default
-        Ok(config.session.default_rpc_url.clone())
+        Ok(config.session.rpc_url.clone())
     } else {
         // No chain_id, no rpc_url, no config default - use Sepolia with warning
         formatter.warning("No --chain-id or --rpc-url specified, using SN_SEPOLIA by default");
