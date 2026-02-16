@@ -17,11 +17,14 @@ pub struct SessionConfig {
     #[serde(default = "default_storage_path")]
     pub storage_path: String,
     #[serde(default = "default_rpc_url")]
-    pub default_rpc_url: String,
+    pub rpc_url: String,
     #[serde(default = "default_keychain_url")]
     pub keychain_url: String,
     #[serde(default = "default_api_url")]
     pub api_url: String,
+    /// Whether rpc_url was explicitly set (via config file or env var)
+    #[serde(skip)]
+    pub rpc_url_explicitly_set: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,9 +67,10 @@ impl Default for SessionConfig {
     fn default() -> Self {
         Self {
             storage_path: default_storage_path(),
-            default_rpc_url: default_rpc_url(),
+            rpc_url: default_rpc_url(),
             keychain_url: default_keychain_url(),
             api_url: default_api_url(),
+            rpc_url_explicitly_set: false,
         }
     }
 }
@@ -90,7 +94,14 @@ impl Config {
         }
 
         let contents = std::fs::read_to_string(&config_path)?;
-        let config: Config = toml::from_str(&contents)?;
+        let mut config: Config = toml::from_str(&contents)?;
+
+        // Check if rpc-url was explicitly set in the config file
+        let raw: toml::Value = toml::from_str(&contents)?;
+        if raw.get("session").and_then(|s| s.get("rpc_url")).is_some() {
+            config.session.rpc_url_explicitly_set = true;
+        }
+
         Ok(config)
     }
 
@@ -130,7 +141,7 @@ impl Config {
         }
 
         match alias {
-            "rpc-url" => Ok(self.session.default_rpc_url.clone()),
+            "rpc-url" => Ok(self.session.rpc_url.clone()),
             "keychain-url" => Ok(self.session.keychain_url.clone()),
             "api-url" => Ok(self.session.api_url.clone()),
             "storage-path" => Ok(self.session.storage_path.clone()),
@@ -152,7 +163,7 @@ impl Config {
         }
 
         match alias {
-            "rpc-url" => self.session.default_rpc_url = value.to_string(),
+            "rpc-url" => self.session.rpc_url = value.to_string(),
             "keychain-url" => self.session.keychain_url = value.to_string(),
             "api-url" => self.session.api_url = value.to_string(),
             "storage-path" => self.session.storage_path = value.to_string(),
@@ -187,7 +198,8 @@ impl Config {
             self.session.storage_path = path;
         }
         if let Ok(rpc_url) = std::env::var("CARTRIDGE_RPC_URL") {
-            self.session.default_rpc_url = rpc_url;
+            self.session.rpc_url = rpc_url;
+            self.session.rpc_url_explicitly_set = true;
         }
         if let Ok(json_output) = std::env::var("CARTRIDGE_JSON_OUTPUT") {
             self.cli.json_output = json_output.eq_ignore_ascii_case("true") || json_output == "1";

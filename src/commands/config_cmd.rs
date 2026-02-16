@@ -29,7 +29,7 @@ pub async fn execute_set(
         .save()
         .map_err(|e| crate::error::CliError::Config(e.to_string()))?;
 
-    formatter.info(&format!("Set {} = {}", key, value));
+    formatter.info(&format!("Set {key} = {value}"));
 
     Ok(())
 }
@@ -54,7 +54,7 @@ pub async fn execute_get(
         };
         formatter.success(&entry);
     } else {
-        println!("{}", value);
+        println!("{value}");
     }
 
     Ok(())

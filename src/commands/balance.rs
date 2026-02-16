@@ -378,8 +378,8 @@ fn resolve_rpc_url(
                 "Unsupported chain ID '{chain}'. Supported chains: SN_MAIN, SN_SEPOLIA"
             ))),
         }
-    } else if !config.session.default_rpc_url.is_empty() {
-        Ok(config.session.default_rpc_url.clone())
+    } else if !config.session.rpc_url.is_empty() {
+        Ok(config.session.rpc_url.clone())
     } else {
         formatter.warning("No --chain-id or --rpc-url specified, using SN_SEPOLIA by default");
         Ok("https://api.cartridge.gg/x/starknet/sepolia".to_string())
