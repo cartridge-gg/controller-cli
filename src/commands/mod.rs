@@ -7,6 +7,7 @@ pub mod execute;
 pub mod lookup;
 pub mod receipt;
 pub mod session;
+pub mod starterpack;
 pub mod status;
 pub mod transaction;
 pub mod username;

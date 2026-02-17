@@ -176,6 +176,12 @@ enum Commands {
         #[arg(long)]
         addresses: Option<String>,
     },
+
+    /// Quote and purchase starterpacks
+    Starterpack {
+        #[command(subcommand)]
+        command: StarterpackCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -194,6 +200,83 @@ enum ConfigCommands {
     },
     /// List all configuration values
     List,
+}
+
+#[derive(Subcommand)]
+enum StarterpackCommands {
+    /// Get a quote for a starterpack (payment token and amount)
+    Quote {
+        /// Starterpack ID
+        id: String,
+
+        /// Quantity to purchase
+        #[arg(long, default_value = "1")]
+        quantity: u32,
+
+        /// Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA') - auto-selects RPC URL
+        #[arg(long, conflicts_with = "rpc_url")]
+        chain_id: Option<String>,
+
+        /// RPC URL to use (overrides config)
+        #[arg(long, conflicts_with = "chain_id")]
+        rpc_url: Option<String>,
+    },
+
+    /// Get info for a starterpack
+    Info {
+        /// Starterpack ID
+        id: String,
+
+        /// Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA') - auto-selects RPC URL
+        #[arg(long, conflicts_with = "rpc_url")]
+        chain_id: Option<String>,
+
+        /// RPC URL to use (overrides config)
+        #[arg(long, conflicts_with = "chain_id")]
+        rpc_url: Option<String>,
+    },
+
+    /// Purchase a starterpack
+    Purchase {
+        /// Starterpack ID
+        id: String,
+
+        /// Recipient address (defaults to current controller)
+        #[arg(long)]
+        recipient: Option<String>,
+
+        /// Quantity to purchase
+        #[arg(long, default_value = "1")]
+        quantity: u32,
+
+        /// Open a UI for purchase (default)
+        #[arg(long, group = "mode")]
+        ui: bool,
+
+        /// Execute purchase directly from Controller wallet
+        #[arg(long, group = "mode")]
+        direct: bool,
+
+        /// Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA') - auto-selects RPC URL
+        #[arg(long, conflicts_with = "rpc_url")]
+        chain_id: Option<String>,
+
+        /// RPC URL to use (overrides config)
+        #[arg(long, conflicts_with = "chain_id")]
+        rpc_url: Option<String>,
+
+        /// Wait for transaction confirmation (direct mode only)
+        #[arg(long)]
+        wait: bool,
+
+        /// Timeout in seconds when waiting (direct mode only)
+        #[arg(long, default_value = "300")]
+        timeout: u64,
+
+        /// Force self-pay, don't use paymaster (direct mode only)
+        #[arg(long)]
+        no_paymaster: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -403,6 +486,60 @@ async fn main() {
             commands::receipt::execute(&config, &*formatter, hash, chain_id, rpc_url, wait, timeout)
                 .await
         }
+        Commands::Starterpack { command } => match command {
+            StarterpackCommands::Quote {
+                id,
+                quantity,
+                chain_id,
+                rpc_url,
+            } => {
+                commands::starterpack::quote::execute(
+                    &config,
+                    &*formatter,
+                    id,
+                    quantity,
+                    chain_id,
+                    rpc_url,
+                )
+                .await
+            }
+            StarterpackCommands::Info {
+                id,
+                chain_id,
+                rpc_url,
+            } => {
+                commands::starterpack::info::execute(&config, &*formatter, id, chain_id, rpc_url)
+                    .await
+            }
+            StarterpackCommands::Purchase {
+                id,
+                recipient,
+                quantity,
+                ui,
+                direct,
+                chain_id,
+                rpc_url,
+                wait,
+                timeout,
+                no_paymaster,
+            } => {
+                commands::starterpack::purchase::execute(
+                    &config,
+                    &*formatter,
+                    id,
+                    recipient,
+                    quantity,
+                    ui,
+                    direct,
+                    chain_id,
+                    rpc_url,
+                    wait,
+                    timeout,
+                    no_paymaster,
+                )
+                .await
+            }
+        },
     };
 
     if let Err(e) = result {
