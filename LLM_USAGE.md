@@ -150,7 +150,7 @@ JSON output:
 The `session auth` command blocks for up to 6 minutes while waiting for the user to authorize in the browser. To avoid blocking your main thread, run it as a background process:
 
 1. Start `session auth` in the background
-2. Capture and display the `short_url` / `authorization_url` to the user immediately
+2. Capture and display the `short_url` to the user immediately (fall back to `authorization_url` if unavailable)
 3. Poll the process for completion
 4. Once it exits successfully, verify with `controller session status --json`
 
