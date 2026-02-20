@@ -10,7 +10,7 @@ use account_sdk::storage::{
 };
 use serde::{Deserialize, Serialize};
 use starknet::signers::SigningKey;
-use std::{fmt::Display, path::PathBuf};
+use std::fmt::Display;
 use url::Url;
 
 #[derive(Serialize, Deserialize)]
@@ -82,6 +82,7 @@ where
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn execute(
     config: &Config,
     formatter: &dyn OutputFormatter,
@@ -90,6 +91,7 @@ pub async fn execute(
     chain_id: Option<String>,
     rpc_url: Option<String>,
     overwrite: bool,
+    account: Option<&str>,
 ) -> Result<()> {
     // Validate that either preset or file is provided
     if preset.is_none() && file.is_none() {
@@ -98,8 +100,12 @@ pub async fn execute(
         ));
     }
 
+    if let Some(name) = account {
+        formatter.info(&format!("Using account: {name}"));
+    }
+
     // Check if there's an active unexpired session before proceeding
-    let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
+    let storage_path = config.resolve_storage_path(account);
     let backend = FileSystemBackend::new(storage_path.clone());
 
     let controller_metadata = backend.controller().ok().flatten();
@@ -153,7 +159,11 @@ pub async fn execute(
     let public_key = format!("0x{:x}", verifying_key.scalar());
     let private_key = signing_key.secret_scalar();
 
-    // Re-open storage as mutable for writes
+    // Re-open storage as mutable for writes (ensure directory exists for named accounts)
+    if account.is_some() {
+        std::fs::create_dir_all(&storage_path)
+            .map_err(|e| CliError::Storage(format!("Failed to create account directory: {e}")))?;
+    }
     let mut backend = FileSystemBackend::new(storage_path.clone());
 
     // Store the keypair as session credentials

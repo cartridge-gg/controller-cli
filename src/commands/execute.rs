@@ -14,7 +14,6 @@ use starknet::{
     core::types::{Call, Felt},
     providers::Provider,
 };
-use std::path::PathBuf;
 
 #[derive(Debug, Deserialize)]
 struct CallFile {
@@ -48,6 +47,7 @@ pub async fn execute(
     chain_id: Option<String>,
     rpc_url: Option<String>,
     no_paymaster: bool,
+    account: Option<&str>,
 ) -> Result<()> {
     // Resolve --chain-id to RPC URL
     let rpc_url = resolve_chain_id_to_rpc(chain_id, rpc_url)?;
@@ -79,7 +79,7 @@ pub async fn execute(
     formatter.info(&format!("Preparing to execute {} call(s)...", calls.len()));
 
     // Load controller metadata first to get address and chain_id for session key
-    let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
+    let storage_path = config.resolve_storage_path(account);
     let backend = FileSystemBackend::new(storage_path);
 
     let controller_metadata = backend

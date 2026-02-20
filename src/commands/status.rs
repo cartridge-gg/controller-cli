@@ -8,7 +8,6 @@ use account_sdk::storage::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Serialize)]
 pub struct StatusOutput {
@@ -45,8 +44,12 @@ struct StoredMethodPolicy {
     entrypoint: String,
 }
 
-pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result<()> {
-    let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
+pub async fn execute(
+    config: &Config,
+    formatter: &dyn OutputFormatter,
+    account: Option<&str>,
+) -> Result<()> {
+    let storage_path = config.resolve_storage_path(account);
     let backend = FileSystemBackend::new(storage_path.clone());
 
     // Check for stored session and controller metadata

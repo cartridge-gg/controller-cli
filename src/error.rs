@@ -78,12 +78,12 @@ impl CliError {
 
     pub fn recovery_hint(&self) -> Option<&'static str> {
         match self {
-            CliError::NoSession => Some("Run 'controller session auth' to create a session"),
+            CliError::NoSession => Some("Run 'controller session auth' to create a session. Use --account <name> for multi-account setups"),
             CliError::SessionExpired(_) => {
-                Some("Run 'controller session auth' to create a new session")
+                Some("Run 'controller session auth' to create a new session. Use --account <name> to target a specific account")
             }
             CliError::InvalidSessionData(_) => {
-                Some("Run 'controller session auth' to create a new session")
+                Some("Run 'controller session auth' to create a new session. Use --account <name> to target a specific account")
             }
             CliError::PolicyViolation { .. } => {
                 Some("Run 'controller session auth' with updated policies")

@@ -1,7 +1,6 @@
 use crate::{config::Config, error::Result, output::OutputFormatter};
 use account_sdk::storage::{filestorage::FileSystemBackend, StorageBackend};
 use serde::Serialize;
-use std::path::PathBuf;
 
 #[derive(Serialize)]
 pub struct ClearOutput {
@@ -13,8 +12,9 @@ pub async fn execute(
     config: &Config,
     formatter: &dyn OutputFormatter,
     skip_confirm: bool,
+    account: Option<&str>,
 ) -> Result<()> {
-    let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
+    let storage_path = config.resolve_storage_path(account);
     let mut backend = FileSystemBackend::new(storage_path.clone());
 
     if !skip_confirm && !config.cli.json_output {

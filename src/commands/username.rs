@@ -3,7 +3,6 @@ use crate::error::{CliError, Result};
 use crate::output::OutputFormatter;
 use account_sdk::storage::{filestorage::FileSystemBackend, StorageBackend};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 const LOOKUP_URL: &str = "https://api.cartridge.gg/accounts/lookup";
 
@@ -22,8 +21,12 @@ struct LookupResponse {
     results: Vec<LookupEntry>,
 }
 
-pub async fn execute(config: &Config, formatter: &dyn OutputFormatter) -> Result<()> {
-    let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
+pub async fn execute(
+    config: &Config,
+    formatter: &dyn OutputFormatter,
+    account: Option<&str>,
+) -> Result<()> {
+    let storage_path = config.resolve_storage_path(account);
     let backend = FileSystemBackend::new(storage_path);
 
     let controller = backend
