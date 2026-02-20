@@ -143,9 +143,10 @@ pub async fn execute(
     symbol: Option<String>,
     chain_id: Option<String>,
     rpc_url: Option<String>,
+    account: Option<&str>,
 ) -> Result<()> {
     // Load session to get account address
-    let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
+    let storage_path = config.resolve_storage_path(account);
     let backend = FileSystemBackend::new(storage_path.clone());
 
     let controller = backend

@@ -205,4 +205,145 @@ impl Config {
             self.cli.json_output = json_output.eq_ignore_ascii_case("true") || json_output == "1";
         }
     }
+
+    /// Validate an account label: must be non-empty, alphanumeric with hyphens/underscores,
+    /// and must not contain path separators or traversal sequences.
+    pub fn validate_account_name(name: &str) -> std::result::Result<(), String> {
+        if name.is_empty() {
+            return Err("Account name cannot be empty".to_string());
+        }
+        if name.len() > 64 {
+            return Err("Account name cannot exceed 64 characters".to_string());
+        }
+        if !name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(format!(
+                "Account name '{name}' contains invalid characters. Only alphanumeric, '-', and '_' are allowed"
+            ));
+        }
+        Ok(())
+    }
+
+    /// Resolve the storage path for a given account label.
+    /// When `account` is `Some("player1")`, returns `<base>/accounts/player1/`.
+    /// When `account` is `None`, returns the default base path (backward compatible).
+    ///
+    /// Panics if the account name is invalid (callers should validate first or use
+    /// `validate_account_name` for user-facing errors).
+    pub fn resolve_storage_path(&self, account: Option<&str>) -> PathBuf {
+        let base = PathBuf::from(shellexpand::tilde(&self.session.storage_path).to_string());
+        match account {
+            Some(name) => {
+                // Defense-in-depth: reject obviously unsafe names even if caller forgot to validate
+                assert!(
+                    Self::validate_account_name(name).is_ok(),
+                    "invalid account name passed to resolve_storage_path: {name}"
+                );
+                base.join("accounts").join(name)
+            }
+            None => base,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_storage_path_default_no_account() {
+        let config = Config {
+            session: SessionConfig {
+                storage_path: "/tmp/controller-test".to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let path = config.resolve_storage_path(None);
+        assert_eq!(path, PathBuf::from("/tmp/controller-test"));
+    }
+
+    #[test]
+    fn resolve_storage_path_with_account() {
+        let config = Config {
+            session: SessionConfig {
+                storage_path: "/tmp/controller-test".to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let path = config.resolve_storage_path(Some("player1"));
+        assert_eq!(
+            path,
+            PathBuf::from("/tmp/controller-test/accounts/player1")
+        );
+    }
+
+    #[test]
+    fn resolve_storage_path_different_accounts_are_isolated() {
+        let config = Config {
+            session: SessionConfig {
+                storage_path: "/tmp/controller-test".to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let path_a = config.resolve_storage_path(Some("player1"));
+        let path_b = config.resolve_storage_path(Some("player2"));
+        assert_ne!(path_a, path_b);
+        assert!(path_a.starts_with("/tmp/controller-test/accounts/"));
+        assert!(path_b.starts_with("/tmp/controller-test/accounts/"));
+    }
+
+    #[test]
+    fn validate_account_name_accepts_valid_names() {
+        assert!(Config::validate_account_name("player1").is_ok());
+        assert!(Config::validate_account_name("my-agent").is_ok());
+        assert!(Config::validate_account_name("bot_42").is_ok());
+        assert!(Config::validate_account_name("ABC").is_ok());
+    }
+
+    #[test]
+    fn validate_account_name_rejects_empty() {
+        assert!(Config::validate_account_name("").is_err());
+    }
+
+    #[test]
+    fn validate_account_name_rejects_path_traversal() {
+        assert!(Config::validate_account_name("..").is_err());
+        assert!(Config::validate_account_name("../etc").is_err());
+        assert!(Config::validate_account_name("foo/bar").is_err());
+        assert!(Config::validate_account_name("foo\\bar").is_err());
+    }
+
+    #[test]
+    fn validate_account_name_rejects_special_chars() {
+        assert!(Config::validate_account_name("player 1").is_err());
+        assert!(Config::validate_account_name("player@1").is_err());
+        assert!(Config::validate_account_name("play!er").is_err());
+    }
+
+    #[test]
+    fn validate_account_name_rejects_too_long() {
+        let long_name = "a".repeat(65);
+        assert!(Config::validate_account_name(&long_name).is_err());
+        // 64 is ok
+        let ok_name = "a".repeat(64);
+        assert!(Config::validate_account_name(&ok_name).is_ok());
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid account name")]
+    fn resolve_storage_path_panics_on_invalid_name() {
+        let config = Config {
+            session: SessionConfig {
+                storage_path: "/tmp/controller-test".to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let _ = config.resolve_storage_path(Some("../etc"));
+    }
 }
