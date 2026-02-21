@@ -5,7 +5,6 @@ use crate::{
 };
 use account_sdk::storage::{filestorage::FileSystemBackend, StorageBackend, StorageValue};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Serialize)]
 pub struct ListOutput {
@@ -30,10 +29,11 @@ pub async fn execute(
     chain_id: Option<String>,
     limit: u32,
     page: u32,
+    account: Option<&str>,
 ) -> Result<()> {
     let page = page.max(1);
 
-    let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
+    let storage_path = config.resolve_storage_path(account);
     let backend = FileSystemBackend::new(storage_path);
     let controller = backend
         .controller()

@@ -25,6 +25,10 @@ struct Cli {
     /// Disable colored output
     #[arg(long, global = true)]
     no_color: bool,
+
+    /// Account label for multi-account support (e.g., 'player1')
+    #[arg(long, global = true)]
+    account: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -354,6 +358,16 @@ async fn main() {
     // Start version check in background (non-blocking)
     let update_check = tokio::spawn(version::check_for_update());
 
+    let account = cli.account;
+
+    // Validate account name early, before any command uses it
+    if let Some(ref name) = account {
+        if let Err(e) = Config::validate_account_name(name) {
+            formatter.error(&crate::error::CliError::InvalidInput(e));
+            std::process::exit(1);
+        }
+    }
+
     let result = match cli.command {
         Commands::Session { command } => match command {
             SessionCommands::Auth {
@@ -371,22 +385,33 @@ async fn main() {
                     chain_id,
                     rpc_url,
                     overwrite,
+                    account.as_deref(),
                 )
                 .await
             }
-            SessionCommands::Status => commands::status::execute(&config, &*formatter).await,
+            SessionCommands::Status => {
+                commands::status::execute(&config, &*formatter, account.as_deref()).await
+            }
             SessionCommands::List {
                 chain_id,
                 limit,
                 page,
             } => {
-                commands::session::list::execute(&config, &*formatter, chain_id, limit, page).await
+                commands::session::list::execute(
+                    &config,
+                    &*formatter,
+                    chain_id,
+                    limit,
+                    page,
+                    account.as_deref(),
+                )
+                .await
             }
             SessionCommands::Revoke => {
-                commands::session::revoke::execute(&config, &*formatter).await
+                commands::session::revoke::execute(&config, &*formatter, account.as_deref()).await
             }
             SessionCommands::Clear { yes } => {
-                commands::clear::execute(&config, &*formatter, yes).await
+                commands::clear::execute(&config, &*formatter, yes, account.as_deref()).await
             }
         },
         Commands::Config { command } => match command {
@@ -423,6 +448,7 @@ async fn main() {
                 chain_id,
                 rpc_url,
                 no_paymaster,
+                account.as_deref(),
             )
             .await
         }
@@ -430,8 +456,20 @@ async fn main() {
             symbol,
             chain_id,
             rpc_url,
-        } => commands::balance::execute(&config, &*formatter, symbol, chain_id, rpc_url).await,
-        Commands::Username => commands::username::execute(&config, &*formatter).await,
+        } => {
+            commands::balance::execute(
+                &config,
+                &*formatter,
+                symbol,
+                chain_id,
+                rpc_url,
+                account.as_deref(),
+            )
+            .await
+        }
+        Commands::Username => {
+            commands::username::execute(&config, &*formatter, account.as_deref()).await
+        }
         Commands::Lookup {
             usernames,
             addresses,
@@ -536,6 +574,7 @@ async fn main() {
                     wait,
                     timeout,
                     no_paymaster,
+                    account.as_deref(),
                 )
                 .await
             }

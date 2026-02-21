@@ -10,7 +10,6 @@ use account_sdk::{
 use serde::Serialize;
 use starknet::core::types::{BlockId, BlockTag, Call, Felt, FunctionCall};
 use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Provider};
-use std::path::PathBuf;
 
 use super::{
     felt_to_u128, format_token_amount, parse_starterpack_id, query_token_info, StarterpackQuote,
@@ -37,6 +36,7 @@ pub async fn execute(
     wait: bool,
     timeout: u64,
     no_paymaster: bool,
+    account: Option<&str>,
 ) -> Result<()> {
     if direct {
         return execute_direct(
@@ -50,6 +50,7 @@ pub async fn execute(
             wait,
             timeout,
             no_paymaster,
+            account,
         )
         .await;
     }
@@ -101,6 +102,7 @@ async fn execute_direct(
     wait: bool,
     timeout: u64,
     no_paymaster: bool,
+    account: Option<&str>,
 ) -> Result<()> {
     let id_felt = parse_starterpack_id(id)?;
     let quantity_felt = Felt::from(quantity);
@@ -109,7 +111,7 @@ async fn execute_direct(
     let rpc_url = resolve_chain_id_to_rpc(chain_id, rpc_url)?;
 
     // Load controller metadata
-    let storage_path = PathBuf::from(shellexpand::tilde(&config.session.storage_path).to_string());
+    let storage_path = config.resolve_storage_path(account);
     let backend = FileSystemBackend::new(storage_path);
 
     let controller_metadata = backend
