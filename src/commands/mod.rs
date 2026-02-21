@@ -5,6 +5,7 @@ pub mod clear;
 pub mod config_cmd;
 pub mod execute;
 pub mod lookup;
+pub mod marketplace;
 pub mod receipt;
 pub mod session;
 pub mod starterpack;
