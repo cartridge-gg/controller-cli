@@ -81,9 +81,8 @@ pub async fn execute(
     // Parse result: (bool, felt252)
     let is_valid = result.first().map(|f| *f != Felt::ZERO).unwrap_or(false);
     let reason_felt = result.get(1).copied().unwrap_or(Felt::ZERO);
-    let validity_reason =
-        starknet::core::utils::parse_cairo_short_string(&reason_felt)
-            .unwrap_or_else(|_| format!("0x{:x}", reason_felt));
+    let validity_reason = starknet::core::utils::parse_cairo_short_string(&reason_felt)
+        .unwrap_or_else(|_| format!("0x{:x}", reason_felt));
 
     let order_info = OrderInfo {
         order_id,
@@ -99,15 +98,16 @@ pub async fn execute(
 
     if config.cli.json_output {
         formatter.success(&InfoOutput { order: order_info });
+    } else if is_valid {
+        formatter.info(&format!(
+            "✅ Order #{} is valid and can be purchased",
+            order_id
+        ));
     } else {
-        if is_valid {
-            formatter.info(&format!("✅ Order #{} is valid and can be purchased", order_id));
-        } else {
-            formatter.warning(&format!(
-                "❌ Order #{} is not valid: {}",
-                order_id, order_info.validity_reason
-            ));
-        }
+        formatter.warning(&format!(
+            "❌ Order #{} is not valid: {}",
+            order_id, order_info.validity_reason
+        ));
     }
 
     Ok(())

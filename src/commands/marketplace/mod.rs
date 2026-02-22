@@ -8,7 +8,8 @@ use starknet::core::types::Felt;
 pub const MARKETPLACE_CONTRACT: Felt =
     Felt::from_hex_unchecked("0x057b4ca2f7b58e1b940eb89c4376d6e166abc640abf326512b0c77091f3f9652");
 
-/// STRK token address (for reference)
+/// STRK token address (for reference in future features)
+#[allow(dead_code)]
 pub const STRK_TOKEN: Felt =
     Felt::from_hex_unchecked("0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d");
 
@@ -17,31 +18,33 @@ pub const STRK_TOKEN: Felt =
 pub fn encode_u256(value: &str) -> Result<(Felt, Felt)> {
     // For simplicity, we'll handle values that fit in u128 (most token IDs)
     // and return high=0 for those cases. For larger values, use hex parsing.
-    
+
     if value.starts_with("0x") || value.starts_with("0X") {
         // Parse as hex - handle potential large values
         // If it fits in a Felt, the high bits are zero for most token IDs
         let felt = Felt::from_hex(value)
             .map_err(|e| CliError::InvalidInput(format!("Invalid hex value '{}': {}", value, e)))?;
-        
+
         // For token IDs that fit in 128 bits (common case), high = 0
         // Extract low 128 bits from felt bytes
         let bytes = felt.to_bytes_be();
         let low = u128::from_be_bytes(bytes[16..32].try_into().unwrap());
         let high = u128::from_be_bytes(bytes[0..16].try_into().unwrap());
-        
+
         Ok((Felt::from(low), Felt::from(high)))
     } else {
         // Parse as decimal
-        let low: u128 = value.parse()
-            .map_err(|e| CliError::InvalidInput(format!("Invalid decimal value '{}': {}", value, e)))?;
-        
+        let low: u128 = value.parse().map_err(|e| {
+            CliError::InvalidInput(format!("Invalid decimal value '{}': {}", value, e))
+        })?;
+
         // Decimal values that fit in u128 have high = 0
         Ok((Felt::from(low), Felt::ZERO))
     }
 }
 
 /// Build the calldata for marketplace execute
+#[allow(clippy::too_many_arguments)]
 pub fn build_execute_calldata(
     order_id: u32,
     collection: Felt,
@@ -119,16 +122,16 @@ mod tests {
     #[test]
     fn test_build_execute_calldata() {
         let calldata = build_execute_calldata(
-            42,                    // order_id
-            Felt::from(0x123u64),  // collection
-            Felt::from(1u64),      // token_id_low
-            Felt::ZERO,            // token_id_high
-            Felt::ZERO,            // asset_id_low
-            Felt::ZERO,            // asset_id_high
-            1,                     // quantity
-            true,                  // royalties
-            0,                     // client_fee
-            Felt::ZERO,            // client_receiver
+            42,                   // order_id
+            Felt::from(0x123u64), // collection
+            Felt::from(1u64),     // token_id_low
+            Felt::ZERO,           // token_id_high
+            Felt::ZERO,           // asset_id_low
+            Felt::ZERO,           // asset_id_high
+            1,                    // quantity
+            true,                 // royalties
+            0,                    // client_fee
+            Felt::ZERO,           // client_receiver
         );
 
         assert_eq!(calldata.len(), 10);
@@ -162,8 +165,7 @@ mod tests {
 
     #[test]
     fn test_resolve_rpc_url_passthrough() {
-        let result =
-            resolve_chain_id_to_rpc(None, Some("https://custom.rpc".to_string())).unwrap();
+        let result = resolve_chain_id_to_rpc(None, Some("https://custom.rpc".to_string())).unwrap();
         assert_eq!(result, Some("https://custom.rpc".to_string()));
     }
 }
