@@ -368,6 +368,67 @@ Valid keys: `rpc-url`, `keychain-url`, `api-url`, `storage-path`, `json-output`,
 
 ---
 
+### 12. Marketplace Commands
+
+Buy NFTs from the Arcade marketplace.
+
+#### Query Order Info
+
+Check if an order is valid before purchasing:
+
+```bash
+controller marketplace info \
+  --order-id 42 \
+  --collection 0x123...abc \
+  --token-id 1 \
+  --chain-id SN_MAIN \
+  --json
+```
+
+Output:
+```json
+{
+  "order": {
+    "order_id": 42,
+    "collection": "0x123...abc",
+    "token_id": "1",
+    "is_valid": true,
+    "validity_reason": "Order is valid"
+  }
+}
+```
+
+#### Buy from Listing
+
+Purchase an NFT from an active marketplace listing:
+
+```bash
+controller marketplace buy \
+  --order-id 42 \
+  --collection 0x123...abc \
+  --token-id 1 \
+  --chain-id SN_MAIN \
+  --wait \
+  --json
+```
+
+Options:
+- `--order-id` (required): The marketplace order ID
+- `--collection` (required): NFT collection contract address
+- `--token-id` (required): Token ID in the collection
+- `--asset-id`: Specific asset ID for ERC1155 (defaults to 0)
+- `--quantity`: Number to purchase (defaults to 1)
+- `--no-royalties`: Skip paying creator royalties
+- `--wait`: Wait for transaction confirmation
+- `--no-paymaster`: Pay gas yourself instead of using paymaster
+
+**Required Session Policies:**
+Your session must include policies for:
+- `execute` on the marketplace contract (`0x057b4ca2f7b58e1b940eb89c4376d6e166abc640abf326512b0c77091f3f9652`)
+- `approve` on the payment token (e.g., STRK)
+
+---
+
 ## Calldata Formats
 
 Calldata values support multiple formats:

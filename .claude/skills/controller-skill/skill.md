@@ -550,6 +550,108 @@ controller config set token.MYTOKEN 0x123...
 
 ---
 
+### controller_marketplace_info
+
+Query marketplace order validity before purchasing.
+
+**When to use:** To check if a marketplace order is valid and can be purchased.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "order_id": {
+      "type": "integer",
+      "description": "The marketplace order ID"
+    },
+    "collection": {
+      "type": "string",
+      "description": "NFT collection contract address"
+    },
+    "token_id": {
+      "type": "string",
+      "description": "Token ID in the collection"
+    },
+    "chain_id": {
+      "type": "string",
+      "description": "Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA')"
+    }
+  },
+  "required": ["order_id", "collection", "token_id"]
+}
+```
+
+**Example:**
+```bash
+controller marketplace info --order-id 42 --collection 0x123...abc --token-id 1 --chain-id SN_MAIN --json
+```
+
+---
+
+### controller_marketplace_buy
+
+Purchase an NFT from a marketplace listing.
+
+**When to use:** To buy an NFT from an active marketplace order.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "order_id": {
+      "type": "integer",
+      "description": "The marketplace order ID to purchase"
+    },
+    "collection": {
+      "type": "string",
+      "description": "NFT collection contract address"
+    },
+    "token_id": {
+      "type": "string",
+      "description": "Token ID in the collection"
+    },
+    "asset_id": {
+      "type": "string",
+      "description": "Asset ID for ERC1155 tokens (defaults to 0)"
+    },
+    "quantity": {
+      "type": "integer",
+      "description": "Quantity to purchase (defaults to 1)"
+    },
+    "no_royalties": {
+      "type": "boolean",
+      "description": "Skip paying creator royalties"
+    },
+    "chain_id": {
+      "type": "string",
+      "description": "Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA')"
+    },
+    "wait": {
+      "type": "boolean",
+      "description": "Wait for transaction confirmation"
+    },
+    "no_paymaster": {
+      "type": "boolean",
+      "description": "Pay gas yourself instead of using paymaster"
+    }
+  },
+  "required": ["order_id", "collection", "token_id"]
+}
+```
+
+**Example:**
+```bash
+controller marketplace buy --order-id 42 --collection 0x123...abc --token-id 1 --chain-id SN_MAIN --wait --json
+```
+
+**Required Session Policies:**
+- `execute` on marketplace contract (`0x057b4ca2f7b58e1b940eb89c4376d6e166abc640abf326512b0c77091f3f9652`)
+- `approve` on payment token (e.g., STRK)
+
+---
+
 ## Calldata Formats
 
 Calldata values support multiple formats:

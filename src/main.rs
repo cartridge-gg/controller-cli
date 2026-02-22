@@ -186,6 +186,12 @@ enum Commands {
         #[command(subcommand)]
         command: StarterpackCommands,
     },
+
+    /// Buy and interact with the Arcade marketplace
+    Marketplace {
+        #[command(subcommand)]
+        command: MarketplaceCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -278,6 +284,79 @@ enum StarterpackCommands {
         timeout: u64,
 
         /// Force self-pay, don't use paymaster (direct mode only)
+        #[arg(long)]
+        no_paymaster: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum MarketplaceCommands {
+    /// Query order validity and details
+    Info {
+        /// Order ID
+        #[arg(long)]
+        order_id: u32,
+
+        /// NFT collection address
+        #[arg(long)]
+        collection: String,
+
+        /// Token ID in the collection
+        #[arg(long)]
+        token_id: String,
+
+        /// Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA') - auto-selects RPC URL
+        #[arg(long, conflicts_with = "rpc_url")]
+        chain_id: Option<String>,
+
+        /// RPC URL to use (overrides config)
+        #[arg(long, conflicts_with = "chain_id")]
+        rpc_url: Option<String>,
+    },
+
+    /// Purchase an NFT from a marketplace listing
+    Buy {
+        /// Order ID to purchase
+        #[arg(long)]
+        order_id: u32,
+
+        /// NFT collection address
+        #[arg(long)]
+        collection: String,
+
+        /// Token ID in the collection
+        #[arg(long)]
+        token_id: String,
+
+        /// Asset ID (for ERC1155, defaults to 0)
+        #[arg(long)]
+        asset_id: Option<String>,
+
+        /// Quantity to purchase
+        #[arg(long, default_value = "1")]
+        quantity: u128,
+
+        /// Skip paying royalties
+        #[arg(long)]
+        no_royalties: bool,
+
+        /// Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA') - auto-selects RPC URL
+        #[arg(long, conflicts_with = "rpc_url")]
+        chain_id: Option<String>,
+
+        /// RPC URL to use (overrides config)
+        #[arg(long, conflicts_with = "chain_id")]
+        rpc_url: Option<String>,
+
+        /// Wait for transaction confirmation
+        #[arg(long)]
+        wait: bool,
+
+        /// Timeout in seconds when waiting
+        #[arg(long, default_value = "300")]
+        timeout: u64,
+
+        /// Force self-pay, don't use paymaster
         #[arg(long)]
         no_paymaster: bool,
     },
@@ -569,6 +648,57 @@ async fn main() {
                     quantity,
                     ui,
                     direct,
+                    chain_id,
+                    rpc_url,
+                    wait,
+                    timeout,
+                    no_paymaster,
+                    account.as_deref(),
+                )
+                .await
+            }
+        },
+        Commands::Marketplace { command } => match command {
+            MarketplaceCommands::Info {
+                order_id,
+                collection,
+                token_id,
+                chain_id,
+                rpc_url,
+            } => {
+                commands::marketplace::info::execute(
+                    &config,
+                    &*formatter,
+                    order_id,
+                    collection,
+                    token_id,
+                    chain_id,
+                    rpc_url,
+                )
+                .await
+            }
+            MarketplaceCommands::Buy {
+                order_id,
+                collection,
+                token_id,
+                asset_id,
+                quantity,
+                no_royalties,
+                chain_id,
+                rpc_url,
+                wait,
+                timeout,
+                no_paymaster,
+            } => {
+                commands::marketplace::buy::execute(
+                    &config,
+                    &*formatter,
+                    order_id,
+                    collection,
+                    token_id,
+                    asset_id,
+                    quantity,
+                    no_royalties,
                     chain_id,
                     rpc_url,
                     wait,
