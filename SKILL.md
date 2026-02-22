@@ -113,6 +113,9 @@ Valid keys: `rpc-url`, `keychain-url`, `api-url`, `storage-path`, `json-output`,
 - Decimal: `100` (auto-converted)
 - `u256:` prefix: `u256:1000000000000000000` (auto-splits into low/high 128-bit felts)
 - `str:` prefix: `str:hello` (Cairo short string encoding)
+- `bytearray:` prefix: `bytearray:hello` (Cairo ByteArray multi-felt serialization)
+- `bytearray:` quoted: `bytearray:"hello world"` (ByteArray with spaces, quotes stripped)
+- `bytearray:` raw bytes: `bytearray:[0x48,0x65,0x6c,0x6c,0x6f]` (ByteArray from raw byte values)
 - Manual u256: split into low,high — e.g., 100 tokens = `0x64,0x0`
 
 ## Policy File Format

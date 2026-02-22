@@ -378,6 +378,9 @@ Calldata values support multiple formats:
 | Decimal | `100` | Decimal felt (auto-converted) |
 | `u256:` | `u256:1000000000000000000` | Auto-splits into low/high 128-bit felts |
 | `str:` | `str:hello` | Cairo short string encoding |
+| `bytearray:` | `bytearray:hello` | Cairo ByteArray multi-felt serialization |
+| `bytearray:` (quoted) | `bytearray:"hello world"` | ByteArray with spaces (quotes stripped) |
+| `bytearray:` (raw) | `bytearray:[0x48,0x65,0x6c,0x6c,0x6f]` | ByteArray from raw byte values |
 
 The `u256:` prefix is the recommended way to specify token amounts. It eliminates manual low/high splitting:
 
@@ -387,6 +390,19 @@ controller execute 0x04718f... transfer 0xRECIPIENT,u256:1000000000000000000 --j
 
 # Equivalent manual split
 controller execute 0x04718f... transfer 0xRECIPIENT,0xDE0B6B3A7640000,0x0 --json
+```
+
+The `bytearray:` prefix serializes strings or raw bytes into Cairo's `ByteArray` format (data chunks + pending word + length). Use it for contract entrypoints that expect a `ByteArray` argument:
+
+```bash
+# String mode (simple, no spaces)
+controller execute 0x... set_name bytearray:MyName --json
+
+# Quoted string mode (use quotes for strings with spaces)
+controller execute 0x... set_name 'bytearray:"My Game Name"' --json
+
+# Raw bytes mode
+controller execute 0x... set_data bytearray:[0x48,0x65,0x6c,0x6c,0x6f] --json
 ```
 
 ---
