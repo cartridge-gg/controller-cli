@@ -106,6 +106,37 @@ controller config list --json          # List all config values
 
 Valid keys: `rpc-url`, `keychain-url`, `api-url`, `storage-path`, `json-output`, `colors`, `callback-timeout`, `token.<symbol>`.
 
+### Marketplace
+
+Buy NFTs from the Arcade marketplace.
+
+```bash
+# Check if an order is valid
+controller marketplace info \
+  --order-id 42 \
+  --collection 0x123...abc \
+  --token-id 1 \
+  --chain-id SN_MAIN --json
+
+# Purchase from a listing
+controller marketplace buy \
+  --order-id 42 \
+  --collection 0x123...abc \
+  --token-id 1 \
+  --chain-id SN_MAIN \
+  --wait --json
+```
+
+Options:
+- `--order-id`: Marketplace order ID
+- `--collection`: NFT collection address
+- `--token-id`: Token ID to purchase
+- `--asset-id`: Asset ID for ERC1155 (default: 0)
+- `--quantity`: Amount to buy (default: 1)
+- `--no-royalties`: Skip creator royalties
+
+Required session policies: `execute` on marketplace contract, `approve` on payment token.
+
 ## Calldata Format
 
 - Values are comma-separated

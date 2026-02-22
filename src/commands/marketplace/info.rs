@@ -79,13 +79,11 @@ pub async fn execute(
         .map_err(|e| CliError::TransactionFailed(format!("get_validity call failed: {}", e)))?;
 
     // Parse result: (bool, felt252)
-    let is_valid = result
-        .first()
-        .map(|f| *f != Felt::ZERO)
-        .unwrap_or(false);
+    let is_valid = result.first().map(|f| *f != Felt::ZERO).unwrap_or(false);
     let reason_felt = result.get(1).copied().unwrap_or(Felt::ZERO);
-    let validity_reason = starknet::core::utils::parse_cairo_short_string(&reason_felt)
-        .unwrap_or_else(|_| format!("0x{:x}", reason_felt));
+    let validity_reason =
+        starknet::core::utils::parse_cairo_short_string(&reason_felt)
+            .unwrap_or_else(|_| format!("0x{:x}", reason_felt));
 
     let order_info = OrderInfo {
         order_id,
