@@ -51,6 +51,10 @@ Generate a keypair and authorize a new session in a single step.
     "rpc_url": {
       "type": "string",
       "description": "RPC URL (overrides config, conflicts with chain_id)"
+    },
+    "account": {
+      "type": "string",
+      "description": "Cartridge username to authorize the session for. Verifies the account exists and displays the resolved address. Also isolates session storage per account."
     }
   }
 }
@@ -61,6 +65,11 @@ Generate a keypair and authorize a new session in a single step.
 **Example (preset):**
 ```bash
 controller session auth --preset loot-survivor --chain-id SN_MAIN --json
+```
+
+**Example (preset with account):**
+```bash
+controller session auth --preset loot-survivor --chain-id SN_MAIN --account shinobi --json
 ```
 
 **Example (policy file):**
