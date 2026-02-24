@@ -45,6 +45,9 @@ Once installed, tools become available:
 - `controller_username` - Get account username
 - `controller_lookup` - Look up usernames/addresses
 - `controller_config` - Manage CLI configuration
+- `controller_starterpack_info` - Get starterpack metadata
+- `controller_starterpack_quote` - Get starterpack price quote
+- `controller_starterpack_purchase` - Purchase a starterpack (UI or direct)
 
 **See:** [Skill Documentation](./.claude/skills/controller-skill/README.md)
 
@@ -365,6 +368,62 @@ controller config list --json
 ```
 
 Valid keys: `rpc-url`, `keychain-url`, `api-url`, `storage-path`, `json-output`, `colors`, `callback-timeout`, `token.<symbol>`.
+
+### 12. Starterpacks
+
+Query starterpack info, get price quotes, and purchase starterpacks.
+
+**Get starterpack metadata:**
+```bash
+controller starterpack info <ID> --chain-id SN_MAIN --json
+```
+
+**Get a price quote:**
+```bash
+controller starterpack quote <ID> --chain-id SN_MAIN --json
+```
+
+Output:
+```json
+{
+  "starterpack_id": "1",
+  "chain_id": "SN_MAIN",
+  "payment_token": "0x04718f...",
+  "base_price": "10.000000",
+  "referral_fee": "0.500000",
+  "protocol_fee": "0.200000",
+  "total_cost": "10.700000"
+}
+```
+
+**Purchase via UI (default — opens browser):**
+```bash
+controller starterpack purchase <ID> --chain-id SN_MAIN
+# or explicitly:
+controller starterpack purchase <ID> --ui --chain-id SN_MAIN
+```
+
+Opens `https://x.cartridge.gg/starterpack/<ID>/<CHAIN>` in the user's browser. The UI supports crosschain payments and Apple Pay — use this when the user wants flexible payment options or doesn't have an active session.
+
+**Purchase directly via Controller wallet:**
+```bash
+controller starterpack purchase <ID> --direct --chain-id SN_MAIN --json
+```
+
+Executes `approve` + `issue` on-chain using the active session. Requires session policies that include:
+- `approve` on the payment token (returned by `quote`)
+- `issue` on the starterpack contract (`0x3eb03b8f2be0ec2aafd186d72f6d8f3dd320dbc89f2b6802bca7465f6ccaa43`)
+
+Additional flags for `--direct`:
+- `--recipient <ADDRESS>` — Purchase for a different address (defaults to controller)
+- `--quantity <N>` — Number to purchase (default: 1)
+- `--wait` — Wait for transaction confirmation
+- `--timeout <SECONDS>` — Timeout when waiting (default: 300)
+- `--no-paymaster` — Pay gas directly instead of using paymaster
+
+**When to use `--ui` vs `--direct`:**
+- `--ui` (default): User wants crosschain payment, Apple Pay, or doesn't have a session with the right policies
+- `--direct`: Automated/scripted purchases where the session already has `approve` + `issue` policies authorized
 
 ---
 
