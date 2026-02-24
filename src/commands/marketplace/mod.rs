@@ -23,7 +23,7 @@ pub fn encode_u256(value: &str) -> Result<(Felt, Felt)> {
         // Parse as hex - handle potential large values
         // If it fits in a Felt, the high bits are zero for most token IDs
         let felt = Felt::from_hex(value)
-            .map_err(|e| CliError::InvalidInput(format!("Invalid hex value '{}': {}", value, e)))?;
+            .map_err(|e| CliError::InvalidInput(format!("Invalid hex value '{value}': {e}")))?;
 
         // For token IDs that fit in 128 bits (common case), high = 0
         // Extract low 128 bits from felt bytes
@@ -34,9 +34,9 @@ pub fn encode_u256(value: &str) -> Result<(Felt, Felt)> {
         Ok((Felt::from(low), Felt::from(high)))
     } else {
         // Parse as decimal
-        let low: u128 = value.parse().map_err(|e| {
-            CliError::InvalidInput(format!("Invalid decimal value '{}': {}", value, e))
-        })?;
+        let low: u128 = value
+            .parse()
+            .map_err(|e| CliError::InvalidInput(format!("Invalid decimal value '{value}': {e}")))?;
 
         // Decimal values that fit in u128 have high = 0
         Ok((Felt::from(low), Felt::ZERO))
@@ -85,8 +85,7 @@ pub fn resolve_chain_id_to_rpc(
                 "https://api.cartridge.gg/x/starknet/sepolia".to_string(),
             )),
             _ => Err(CliError::InvalidInput(format!(
-                "Unsupported chain ID '{}'. Supported chains: SN_MAIN, SN_SEPOLIA",
-                chain
+                "Unsupported chain ID '{chain}'. Supported chains: SN_MAIN, SN_SEPOLIA"
             ))),
         },
         None => Ok(rpc_url),
