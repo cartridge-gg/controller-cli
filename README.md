@@ -253,6 +253,47 @@ MYTOKEN = "0x123..."
 | `CARTRIDGE_RPC_URL` | Default RPC endpoint |
 | `CARTRIDGE_JSON_OUTPUT` | Default to JSON output |
 
+### 11. Starterpacks
+
+Query and purchase starterpacks (bundled game assets).
+
+**Get info:**
+
+```bash
+controller starterpack info <ID> --chain-id SN_MAIN
+```
+
+**Get a price quote:**
+
+```bash
+controller starterpack quote <ID> --chain-id SN_MAIN
+```
+
+**Purchase via UI (default):**
+
+```bash
+controller starterpack purchase <ID> --chain-id SN_MAIN
+# or explicitly:
+controller starterpack purchase <ID> --ui --chain-id SN_MAIN
+```
+
+Opens the Cartridge purchase page in your browser. Supports crosschain payments and Apple Pay.
+
+**Purchase directly from Controller wallet:**
+
+```bash
+controller starterpack purchase <ID> --direct --chain-id SN_MAIN --json
+```
+
+Executes the purchase on-chain using the active session. Requires session policies that include `approve` on the payment token and `issue` on the starterpack contract.
+
+Additional flags for `--direct` mode:
+- `--recipient <ADDRESS>` — Send to a different address (defaults to current controller)
+- `--quantity <N>` — Number to purchase (default: 1)
+- `--wait` — Wait for transaction confirmation
+- `--timeout <SECONDS>` — Confirmation timeout (default: 300)
+- `--no-paymaster` — Pay gas with user funds instead of paymaster
+
 ## Architecture
 
 Built on [`account_sdk`](https://github.com/cartridge-gg/controller-rs) which provides session management, transaction execution, policy validation, and file-based storage. The CLI is a thin wrapper optimized for automation and scripting.

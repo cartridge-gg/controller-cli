@@ -21,6 +21,7 @@ Use this skill when the user wants to:
 - Check transaction status or receipts
 - Query token balances
 - Look up usernames or addresses
+- Query or purchase starterpacks
 
 ## Tools
 
@@ -649,6 +650,105 @@ controller marketplace buy --order-id 42 --collection 0x123...abc --token-id 1 -
 **Required Session Policies:**
 - `execute` on marketplace contract (`0x057b4ca2f7b58e1b940eb89c4376d6e166abc640abf326512b0c77091f3f9652`)
 - `approve` on payment token (e.g., STRK)
+
+---
+
+### controller_starterpack_info
+
+Get metadata for a starterpack (name, description, image, items).
+
+**When to use:** To display starterpack details before purchasing.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": { "type": "string", "description": "Starterpack ID (decimal or hex)" },
+    "chain_id": { "type": "string", "description": "Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA')" },
+    "rpc_url": { "type": "string", "description": "RPC URL (overrides config, conflicts with chain_id)" }
+  },
+  "required": ["id"]
+}
+```
+
+**Example:**
+```bash
+controller starterpack info 1 --chain-id SN_MAIN --json
+```
+
+---
+
+### controller_starterpack_quote
+
+Get a price quote for a starterpack (payment token, fees, total cost).
+
+**When to use:** To check the cost before purchasing.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": { "type": "string", "description": "Starterpack ID (decimal or hex)" },
+    "quantity": { "type": "number", "description": "Quantity to purchase (default: 1)", "default": 1 },
+    "chain_id": { "type": "string", "description": "Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA')" },
+    "rpc_url": { "type": "string", "description": "RPC URL (overrides config, conflicts with chain_id)" }
+  },
+  "required": ["id"]
+}
+```
+
+**Example:**
+```bash
+controller starterpack quote 1 --chain-id SN_MAIN --json
+```
+
+---
+
+### controller_starterpack_purchase
+
+Purchase a starterpack via UI (browser) or directly from Controller wallet.
+
+**When to use:** To purchase a starterpack for the user or a recipient.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": { "type": "string", "description": "Starterpack ID (decimal or hex)" },
+    "ui": { "type": "boolean", "description": "Open browser UI for purchase (default mode). Supports crosschain payments and Apple Pay." },
+    "direct": { "type": "boolean", "description": "Execute purchase directly via Controller wallet session. Requires approve + issue policies." },
+    "recipient": { "type": "string", "description": "Recipient address (defaults to current controller). Direct mode only." },
+    "quantity": { "type": "number", "description": "Quantity to purchase (default: 1). Direct mode only.", "default": 1 },
+    "chain_id": { "type": "string", "description": "Chain ID (e.g., 'SN_MAIN' or 'SN_SEPOLIA')" },
+    "rpc_url": { "type": "string", "description": "RPC URL (overrides config, conflicts with chain_id)" },
+    "wait": { "type": "boolean", "description": "Wait for transaction confirmation. Direct mode only.", "default": false },
+    "timeout": { "type": "number", "description": "Timeout in seconds when waiting (default: 300). Direct mode only.", "default": 300 },
+    "no_paymaster": { "type": "boolean", "description": "Pay gas directly instead of using paymaster. Direct mode only.", "default": false }
+  },
+  "required": ["id"]
+}
+```
+
+**`--ui` mode (default):** Opens `https://x.cartridge.gg/starterpack/<ID>/<CHAIN>` in the browser. The user completes payment manually. Supports crosschain payments and Apple Pay.
+
+**`--direct` mode:** Executes `approve` + `issue` on-chain using the active session. The session must have policies for:
+- `approve` on the payment token (check via `starterpack quote`)
+- `issue` on the starterpack contract (`0x3eb03b8f2be0ec2aafd186d72f6d8f3dd320dbc89f2b6802bca7465f6ccaa43`)
+
+**Example (UI):**
+```bash
+controller starterpack purchase 1 --chain-id SN_MAIN
+controller starterpack purchase 1 --ui --chain-id SN_MAIN
+```
+
+**Example (direct):**
+```bash
+controller starterpack purchase 1 --direct --chain-id SN_MAIN --json
+controller starterpack purchase 1 --direct --recipient 0xABC... --quantity 2 --wait --json
+```
 
 ---
 

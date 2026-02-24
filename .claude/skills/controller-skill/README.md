@@ -148,6 +148,37 @@ You can create custom policy files for your specific contracts and methods.
 13. **controller_config_get** - Get a config value
 14. **controller_config_list** - List all config values
 
+### Starterpacks
+15. **controller_starterpack_info** - Get starterpack metadata (name, description, items)
+16. **controller_starterpack_quote** - Get price quote (payment token, fees, total cost)
+17. **controller_starterpack_purchase** - Purchase a starterpack (`--ui` for browser/crosschain/Apple Pay, `--direct` for on-chain via session)
+
+### Starterpacks
+```
+You: "What's in starterpack #1?"
+
+Claude: [Uses controller starterpack info 1 --chain-id SN_MAIN --json]
+Claude: "Starterpack #1 'Battle Kit' contains: Sword, Shield, 100 Gold"
+```
+
+```
+You: "How much does it cost?"
+
+Claude: [Uses controller starterpack quote 1 --chain-id SN_MAIN --json]
+Claude: "Total cost: 10.70 STRK (base: 10.00, fees: 0.70)"
+```
+
+```
+You: "Buy it for me"
+
+Claude: "Would you like to purchase via browser (supports crosschain/Apple Pay) or directly from your wallet?"
+
+You: "Browser"
+
+Claude: [Uses controller starterpack purchase 1 --chain-id SN_MAIN]
+Claude: "Opening the purchase page — complete payment in your browser."
+```
+
 ## Calldata Formats
 
 Calldata values support multiple formats:
