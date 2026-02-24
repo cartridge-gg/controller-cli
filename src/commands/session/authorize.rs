@@ -101,7 +101,54 @@ pub async fn execute(
     }
 
     if let Some(name) = account {
-        formatter.info(&format!("Using account: {name}"));
+        // Look up the account to verify it resolves to a controller address
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .map_err(|e| CliError::ApiError(format!("Failed to build HTTP client: {e}")))?;
+
+        let response = client
+            .post("https://api.cartridge.gg/accounts/lookup")
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({ "usernames": [name] }))
+            .send()
+            .await
+            .map_err(|e| CliError::ApiError(format!("Account lookup failed: {e}")))?;
+
+        if !response.status().is_success() {
+            return Err(CliError::ApiError(format!(
+                "Account lookup failed with status: {}",
+                response.status()
+            )));
+        }
+
+        #[derive(Deserialize)]
+        struct LookupEntry {
+            addresses: Vec<String>,
+        }
+        #[derive(Deserialize)]
+        struct LookupResponse {
+            results: Vec<LookupEntry>,
+        }
+
+        let lookup: LookupResponse = response
+            .json()
+            .await
+            .map_err(|e| CliError::ApiError(format!("Failed to parse lookup response: {e}")))?;
+
+        let address = lookup
+            .results
+            .first()
+            .and_then(|entry| entry.addresses.first())
+            .ok_or_else(|| {
+                CliError::InvalidInput(format!(
+                    "Account '{name}' not found. Verify the account exists on Cartridge."
+                ))
+            })?;
+
+        formatter.info(&format!(
+            "Authorizing session for account {name} ({address})"
+        ));
     }
 
     // Check if there's an active unexpired session before proceeding
@@ -372,12 +419,19 @@ pub async fn execute(
     let mut url = Url::parse(&format!("{}/session", config.session.keychain_url))
         .map_err(|e| CliError::InvalidInput(format!("Invalid keychain URL: {e}")))?;
 
-    url.query_pairs_mut()
-        .append_pair("public_key", &public_key)
-        .append_pair("redirect_uri", "https://x.cartridge.gg")
-        .append_pair("policies", &policies_json)
-        .append_pair("rpc_url", effective_rpc_url)
-        .append_pair("mode", "cli"); // Tell keychain this is CLI mode (don't include session data in redirect)
+    {
+        let mut pairs = url.query_pairs_mut();
+        pairs
+            .append_pair("public_key", &public_key)
+            .append_pair("redirect_uri", "https://x.cartridge.gg")
+            .append_pair("policies", &policies_json)
+            .append_pair("rpc_url", effective_rpc_url)
+            .append_pair("mode", "cli"); // Tell keychain this is CLI mode (don't include session data in redirect)
+
+        if let Some(name) = account {
+            pairs.append_pair("account", name);
+        }
+    }
 
     let authorization_url = url.to_string();
 

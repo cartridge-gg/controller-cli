@@ -38,7 +38,7 @@ pub async fn execute(
 ) -> Result<()> {
     // Parse addresses and IDs
     let collection_felt = Felt::from_hex(&collection)
-        .map_err(|e| CliError::InvalidInput(format!("Invalid collection address: {}", e)))?;
+        .map_err(|e| CliError::InvalidInput(format!("Invalid collection address: {e}")))?;
     let (token_id_low, token_id_high) = encode_u256(&token_id)?;
     let (asset_id_low, asset_id_high) = match asset_id {
         Some(ref id) => encode_u256(id)?,
@@ -116,7 +116,7 @@ pub async fn execute(
     }
 
     let rpc_parsed = url::Url::parse(&effective_rpc_url)
-        .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {}", e)))?;
+        .map_err(|e| CliError::InvalidInput(format!("Invalid RPC URL: {e}")))?;
 
     let provider = JsonRpcClient::new(HttpTransport::new(rpc_parsed.clone()));
 
@@ -124,7 +124,7 @@ pub async fn execute(
     formatter.info("Checking order validity...");
 
     let validity_selector = starknet::core::utils::get_selector_from_name("get_validity")
-        .map_err(|e| CliError::InvalidInput(format!("Invalid entrypoint: {}", e)))?;
+        .map_err(|e| CliError::InvalidInput(format!("Invalid entrypoint: {e}")))?;
 
     let validity_result = provider
         .call(
@@ -141,7 +141,7 @@ pub async fn execute(
             BlockId::Tag(BlockTag::Latest),
         )
         .await
-        .map_err(|e| CliError::TransactionFailed(format!("Validity check failed: {}", e)))?;
+        .map_err(|e| CliError::TransactionFailed(format!("Validity check failed: {e}")))?;
 
     let is_valid = validity_result
         .first()
@@ -151,10 +151,9 @@ pub async fn execute(
     if !is_valid {
         let reason_felt = validity_result.get(1).copied().unwrap_or(Felt::ZERO);
         let reason = starknet::core::utils::parse_cairo_short_string(&reason_felt)
-            .unwrap_or_else(|_| format!("0x{:x}", reason_felt));
+            .unwrap_or_else(|_| format!("0x{reason_felt:x}"));
         return Err(CliError::InvalidInput(format!(
-            "Order #{} is not valid: {}",
-            order_id, reason
+            "Order #{order_id} is not valid: {reason}"
         )));
     }
 
@@ -178,7 +177,7 @@ pub async fn execute(
 
     // Build execute call
     let execute_selector = starknet::core::utils::get_selector_from_name("execute")
-        .map_err(|e| CliError::InvalidInput(format!("Invalid entrypoint: {}", e)))?;
+        .map_err(|e| CliError::InvalidInput(format!("Invalid entrypoint: {e}")))?;
 
     let execute_calldata = build_execute_calldata(
         order_id,
@@ -213,11 +212,11 @@ pub async fn execute(
         Some(backend),
     )
     .await
-    .map_err(|e| CliError::Storage(format!("Failed to create controller: {}", e)))?;
+    .map_err(|e| CliError::Storage(format!("Failed to create controller: {e}")))?;
 
     let chain_name = match controller.provider.chain_id().await {
         Ok(felt) => starknet::core::utils::parse_cairo_short_string(&felt)
-            .unwrap_or_else(|_| format!("0x{:x}", felt)),
+            .unwrap_or_else(|_| format!("0x{felt:x}")),
         Err(_) => starknet::core::utils::parse_cairo_short_string(&controller_metadata.chain_id)
             .unwrap_or_else(|_| format!("0x{:x}", controller_metadata.chain_id)),
     };
@@ -226,29 +225,24 @@ pub async fn execute(
     // Execute
     let result = if no_paymaster {
         formatter.info(&format!(
-            "Purchasing order #{} on {} without paymaster...",
-            order_id, chain_name
+            "Purchasing order #{order_id} on {chain_name} without paymaster..."
         ));
         let estimate = controller
             .estimate_invoke_fee(calls.clone())
             .await
-            .map_err(|e| CliError::TransactionFailed(format!("Fee estimation failed: {}", e)))?;
+            .map_err(|e| CliError::TransactionFailed(format!("Fee estimation failed: {e}")))?;
         controller
             .execute(calls, Some(estimate), None)
             .await
-            .map_err(|e| CliError::TransactionFailed(format!("Transaction failed: {}", e)))?
+            .map_err(|e| CliError::TransactionFailed(format!("Transaction failed: {e}")))?
     } else {
-        formatter.info(&format!(
-            "Purchasing order #{} on {}...",
-            order_id, chain_name
-        ));
+        formatter.info(&format!("Purchasing order #{order_id} on {chain_name}..."));
         controller
             .execute_from_outside_v3(calls, None)
             .await
             .map_err(|e| {
                 CliError::TransactionFailed(format!(
-                    "Paymaster execution failed: {}\nUse --no-paymaster to force self-pay",
-                    e
+                    "Paymaster execution failed: {e}\nUse --no-paymaster to force self-pay"
                 ))
             })?
     };
@@ -263,8 +257,7 @@ pub async fn execute(
         });
     } else {
         formatter.info(&format!(
-            "Transaction: https://{}voyager.online/tx/{}",
-            voyager_subdomain, transaction_hash
+            "Transaction: https://{voyager_subdomain}voyager.online/tx/{transaction_hash}"
         ));
     }
 
@@ -278,8 +271,7 @@ pub async fn execute(
         loop {
             if start.elapsed() > timeout_duration {
                 return Err(CliError::TransactionFailed(format!(
-                    "Transaction confirmation timeout after {} seconds",
-                    timeout
+                    "Transaction confirmation timeout after {timeout} seconds"
                 )));
             }
 
@@ -309,8 +301,7 @@ fn validate_marketplace_policies(policies: &Option<PolicyStorage>) -> Result<()>
     match policies {
         None => {
             missing.push(format!(
-                "execute on marketplace contract (0x{:x})",
-                MARKETPLACE_CONTRACT
+                "execute on marketplace contract (0x{MARKETPLACE_CONTRACT:x})"
             ));
         }
         Some(policies) => {
@@ -320,8 +311,7 @@ fn validate_marketplace_policies(policies: &Option<PolicyStorage>) -> Result<()>
             });
             if !has_execute {
                 missing.push(format!(
-                    "execute on marketplace contract (0x{:x})",
-                    MARKETPLACE_CONTRACT
+                    "execute on marketplace contract (0x{MARKETPLACE_CONTRACT:x})"
                 ));
             }
         }
