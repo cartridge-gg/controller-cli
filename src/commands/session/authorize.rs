@@ -90,6 +90,7 @@ pub struct AuthorizeOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub short_url: Option<String>,
     pub public_key: String,
+    pub expires: String,
     pub message: String,
 }
 
@@ -488,6 +489,7 @@ pub async fn execute(
         authorization_url: authorization_url.clone(),
         short_url: short_url.clone(),
         public_key: public_key.clone(),
+        expires: expires.to_string(),
         message:
             "Open this URL in your browser to authorize the session. Waiting for authorization..."
                 .to_string(),
@@ -502,6 +504,7 @@ pub async fn execute(
             formatter.info("Authorization URL:");
         }
         println!("\n{display_url}\n");
+        formatter.info(&format!("Session expires in: {expires}"));
         formatter.info("Waiting for authorization...");
     }
 
