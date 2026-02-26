@@ -93,6 +93,8 @@ The `session auth` command combines keypair generation and session registration 
 
 **`--account` flag:** Use `--account <username>` to authorize a session for a specific Cartridge account. The CLI will verify the username exists and resolve it to a controller address before proceeding. This also isolates session storage per account, enabling multiple concurrent sessions.
 
+**`--expires` flag:** Use `--expires <duration>` to set the session expiration. Accepts human-readable durations: `1min`, `1hr`, `1day`, `7days`, `1week`, `1year` (plurals supported for day/week/year). Defaults to `7days`.
+
 #### Option A: Use a Preset (Recommended)
 
 For popular games/apps, use a preset from [cartridge-gg/presets](https://github.com/cartridge-gg/presets/tree/main/configs):
@@ -110,6 +112,15 @@ controller session auth \
   --preset loot-survivor \
   --chain-id SN_MAIN \
   --account shinobi \
+  --json
+```
+
+**With custom expiration:**
+```bash
+controller session auth \
+  --preset loot-survivor \
+  --chain-id SN_MAIN \
+  --expires 1hr \
   --json
 ```
 

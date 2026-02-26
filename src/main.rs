@@ -385,6 +385,11 @@ enum SessionCommands {
         /// Overwrite existing session without confirmation
         #[arg(long)]
         overwrite: bool,
+
+        /// Session expiration duration (e.g., '1min', '1hr', '1day', '7days', '1week', '1year')
+        /// Defaults to 7days
+        #[arg(long, default_value = "7days")]
+        expires: String,
     },
 
     /// Display current session status and information
@@ -455,6 +460,7 @@ async fn main() {
                 chain_id,
                 rpc_url,
                 overwrite,
+                expires,
             } => {
                 commands::session::authorize::execute(
                     &config,
@@ -465,6 +471,7 @@ async fn main() {
                     rpc_url,
                     overwrite,
                     account.as_deref(),
+                    &expires,
                 )
                 .await
             }

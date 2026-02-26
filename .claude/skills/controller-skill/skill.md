@@ -55,6 +55,11 @@ Generate a keypair and authorize a new session in a single step.
     "account": {
       "type": "string",
       "description": "Cartridge username to authorize the session for. Verifies the account exists and displays the resolved address. Also isolates session storage per account."
+    },
+    "expires": {
+      "type": "string",
+      "description": "Session expiration duration (e.g., '1min', '1hr', '1day', '7days', '1week', '1year'). Plurals supported for day/week/year. Defaults to '7days'.",
+      "default": "7days"
     }
   }
 }
@@ -70,6 +75,11 @@ controller session auth --preset loot-survivor --chain-id SN_MAIN --json
 **Example (preset with account):**
 ```bash
 controller session auth --preset loot-survivor --chain-id SN_MAIN --account shinobi --json
+```
+
+**Example (custom expiration):**
+```bash
+controller session auth --preset loot-survivor --chain-id SN_MAIN --expires 1hr --json
 ```
 
 **Example (policy file):**

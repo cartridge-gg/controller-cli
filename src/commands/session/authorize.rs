@@ -11,6 +11,7 @@ use account_sdk::storage::{
 use serde::{Deserialize, Serialize};
 use starknet::signers::SigningKey;
 use std::fmt::Display;
+use std::time::{SystemTime, UNIX_EPOCH};
 use url::Url;
 
 #[derive(Serialize, Deserialize)]
@@ -49,12 +50,47 @@ fn default_authorized() -> bool {
     true
 }
 
+/// Parse a duration string like "1min", "1hr", "7days", "1week", "1year"
+/// and return the corresponding unix timestamp (now + duration).
+fn parse_expiration(duration: &str) -> Result<u64> {
+    let duration = duration.trim().to_lowercase();
+
+    let (num_str, unit) = duration
+        .find(|c: char| c.is_alphabetic())
+        .map(|i| (&duration[..i], &duration[i..]))
+        .ok_or_else(|| CliError::InvalidInput("Invalid duration format".to_string()))?;
+
+    let num: u64 = num_str
+        .parse()
+        .map_err(|_| CliError::InvalidInput(format!("Invalid number in duration: {num_str}")))?;
+
+    let seconds = match unit {
+        "min" | "mins" => num * 60,
+        "hr" | "hrs" => num * 3600,
+        "day" | "days" => num * 86400,
+        "week" | "weeks" => num * 604800,
+        "year" | "years" => num * 31536000,
+        _ => {
+            return Err(CliError::InvalidInput(format!(
+                "Unknown duration unit: '{unit}'. Use min, hr, day/days, week/weeks, or year/years"
+            )))
+        }
+    };
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| CliError::InvalidInput(format!("System time error: {e}")))?;
+
+    Ok(now.as_secs() + seconds)
+}
+
 #[derive(Serialize)]
 pub struct AuthorizeOutput {
     pub authorization_url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub short_url: Option<String>,
     pub public_key: String,
+    pub expires: String,
     pub message: String,
 }
 
@@ -92,6 +128,7 @@ pub async fn execute(
     rpc_url: Option<String>,
     overwrite: bool,
     account: Option<&str>,
+    expires: &str,
 ) -> Result<()> {
     // Validate that either preset or file is provided
     if preset.is_none() && file.is_none() {
@@ -305,6 +342,7 @@ pub async fn execute(
     formatter.info(&format!(
         "Policies loaded: {total_contracts} contracts, {total_entrypoints} entrypoints"
     ));
+    formatter.info(&format!("Session expiration: {expires}"));
 
     // Convert to the format expected by the keychain
     let mut policies = serde_json::json!({
@@ -415,6 +453,9 @@ pub async fn execute(
         }
     };
 
+    // Parse expiration duration
+    let expires_at = parse_expiration(expires)?;
+
     // Build the authorization URL
     let mut url = Url::parse(&format!("{}/session", config.session.keychain_url))
         .map_err(|e| CliError::InvalidInput(format!("Invalid keychain URL: {e}")))?;
@@ -426,6 +467,7 @@ pub async fn execute(
             .append_pair("redirect_uri", "https://x.cartridge.gg")
             .append_pair("policies", &policies_json)
             .append_pair("rpc_url", effective_rpc_url)
+            .append_pair("expires_at", &expires_at.to_string())
             .append_pair("mode", "cli"); // Tell keychain this is CLI mode (don't include session data in redirect)
 
         if let Some(name) = account {
@@ -448,6 +490,7 @@ pub async fn execute(
         authorization_url: authorization_url.clone(),
         short_url: short_url.clone(),
         public_key: public_key.clone(),
+        expires: expires.to_string(),
         message:
             "Open this URL in your browser to authorize the session. Waiting for authorization..."
                 .to_string(),
