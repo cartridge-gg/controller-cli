@@ -43,6 +43,8 @@ Or use a preset for popular games/apps:
 controller session auth --preset loot-survivor --chain-id SN_MAIN
 ```
 
+Use `--expires` to set session duration (default: `7days`). Accepts: `1min`, `1hr`, `1day`, `7days`, `1week`, `1year`.
+
 This generates a new keypair, creates an authorization URL, and automatically polls until you authorize in the browser and stores the session.
 
 ### 2. Execute Transactions
