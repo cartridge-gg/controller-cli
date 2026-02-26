@@ -342,6 +342,7 @@ pub async fn execute(
     formatter.info(&format!(
         "Policies loaded: {total_contracts} contracts, {total_entrypoints} entrypoints"
     ));
+    formatter.info(&format!("Session expiration: {expires}"));
 
     // Convert to the format expected by the keychain
     let mut policies = serde_json::json!({
@@ -504,7 +505,6 @@ pub async fn execute(
             formatter.info("Authorization URL:");
         }
         println!("\n{display_url}\n");
-        formatter.info(&format!("Session expires in: {expires}"));
         formatter.info("Waiting for authorization...");
     }
 
